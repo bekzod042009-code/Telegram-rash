@@ -31,6 +31,12 @@ Faqat bitta nusxa (replica) ishlasin: bot long polling orqali ishlaydi.
 Click/Payme hali ulanmagan. Balans to‘ldirish, kredit paketi va pul yechish **ariza** sifatida
 adminga keladi: Admin → Daromad → Tasdiqlash / Rad etish. Pulni o‘zingiz tekshirasiz va o‘tkazasiz.
 
+## Variantlar va tekshiruv
+
+Oddiy testda har bir variant uchun matn qatori bor (rasmli savolda ixtiyoriy).
+O‘qituvchi: Testlarim → Natijalar → o‘quvchi. Imlo xatosi sabab xato olingan yozma javobni
+**To‘g‘ri deb hisoblash** mumkin (bekor qilish ham bor).
+
 ## Rasmlar
 
 Faqat oddiy testda. JPG, PNG, WEBP; telefonda kichraytiriladi (1600 px gacha) va bazada saqlanadi.

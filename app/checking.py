@@ -61,3 +61,17 @@ def check(answer: str, accepted: list[str], mode: str) -> bool:
         if ok:
             return True
     return False
+
+
+def grade(key: list[dict], answers: list, accepted: list[int]) -> tuple[list[dict], int]:
+    """Har bir savol bo'yicha natija: avtomatik tekshiruv + o'qituvchi qabul qilganlari."""
+    review, total = [], 0
+    for i, q in enumerate(key):
+        mine = answers[i] if i < len(answers) else None
+        auto = check(mine or "", q["acc"], q["md"]) if q["w"] else mine == q["a"]
+        manual = bool(q["w"] and not auto and i in accepted)
+        ok = auto or manual
+        total += ok
+        review.append({"t": q["t"], "img": q["img"], "opts": q.get("opts", []), "w": q["w"], "a": q["a"],
+                       "acc": q["acc"], "my": mine, "auto": auto, "manual": manual, "ok": ok})
+    return review, total

@@ -91,3 +91,20 @@ span.b{cursor:default}
 .toast.low{bottom:calc(16px + env(safe-area-inset-bottom,0px))}
 .cta:disabled{opacity:.45;cursor:default}
 .card .lnk{margin-right:16px}
+/* variant qatorlari va tekshiruv */
+.hint{color:var(--mute);font-size:14px;align-self:center}
+.opts{margin:10px 0 0 32px;display:grid;gap:8px}
+.opts.flat{margin:0;flex:1;min-width:0}
+.rl.top{align-items:flex-start}
+.rl.top .num{padding-top:9px}
+.opt,.optb,.optv{display:flex;align-items:center;gap:10px;min-width:0}
+.opt .b,.optb .b,.optv .b{flex:none}
+.opt textarea{flex:1;min-width:0;min-height:44px;resize:none;overflow:hidden;padding:10px 12px}
+.row.miss .opt textarea{border-color:var(--red)}
+.optb,.optv{overflow-wrap:anywhere}
+.optb{width:100%;text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:26px;padding:5px 12px 5px 5px;color:var(--ink);font:inherit;cursor:pointer}
+.optb.on{border-color:var(--green);background:var(--gsoft)}
+.optb.on .b{background:var(--green);border-color:var(--green);color:#fff}
+.optv span:last-child,.optb span:last-child{min-width:0;white-space:pre-wrap}
+.mark{margin-top:8px;padding:10px;font-size:14px}
+.card.click .tbad{display:block}

@@ -69,6 +69,7 @@ class Question(BaseModel):
     a: str | None = Field(default=None, max_length=1)
     acc: list[str] = Field(default_factory=list, max_length=20)
     md: Literal["key", "exact", "fuzzy"] = "key"
+    opts: list[str] = Field(default_factory=list, max_length=6)
 
 
 class NewTest(BaseModel):
@@ -92,6 +93,7 @@ def build_key(body: NewTest) -> list[dict]:
         if not body.printed and not text and not img:
             raise HTTPException(400, f"{i}-savolda matn yoki rasm yoʻq.")
         accepted = []
+        options = []
         answer = None
         if q.w:
             accepted = [a.strip() for a in q.acc if checking.norm(a)]
@@ -101,7 +103,15 @@ def build_key(body: NewTest) -> list[dict]:
             if not q.a or q.a not in config.LETTERS[:body.k]:
                 raise HTTPException(400, f"{i}-savolda javob belgilanmagan.")
             answer = q.a
-        key.append({"t": text, "img": img, "w": q.w, "a": answer, "acc": accepted, "md": q.md})
+            if not body.printed:
+                options = [o.strip() for o in q.opts[:body.k]]
+                options += [""] * (body.k - len(options))
+                if any(len(o) > 500 for o in options):
+                    raise HTTPException(400, f"{i}-savolda variant matni juda uzun.")
+                # Rasmli savolda variantlar rasmning ichida bo'lishi mumkin.
+                if not img and not all(options):
+                    raise HTTPException(400, f"{i}-savolda variant matni yoʻq.")
+        key.append({"t": text, "img": img, "w": q.w, "a": answer, "acc": accepted, "md": q.md, "opts": options})
     return key
 
 
@@ -142,7 +152,76 @@ async def create_test(body: NewTest, acc=Depends(auth.teacher)):
 @router.get("/api/my/tests")
 async def my_tests(acc=Depends(auth.teacher)):
     rows = await db.pool.fetch(TESTS_SQL + " WHERE t.owner_id = $1 ORDER BY t.created_at DESC", acc["id"])
-    return [card(r) for r in rows]
+    counts = dict(await db.pool.fetch(
+        """SELECT a.test_code, COUNT(*) FROM attempts a JOIN tests t ON t.code = a.test_code
+           WHERE t.owner_id = $1 AND a.submitted_at IS NOT NULL GROUP BY a.test_code""", acc["id"]))
+    return [{**card(r), "attempts": counts.get(r["code"], 0)} for r in rows]
+
+
+@router.get("/api/my/tests/{code}/attempts")
+async def test_attempts(code: str, acc=Depends(auth.teacher)):
+    test = await db.pool.fetchrow(
+        "SELECT title, key FROM tests WHERE code = $1 AND owner_id = $2", code, acc["id"])
+    if not test:
+        raise HTTPException(404, "Test topilmadi.")
+    rows = await db.pool.fetch(
+        """SELECT a.id, a.answers, a.accepted, a.submitted_at, s.name FROM attempts a
+           JOIN accounts s ON s.id = a.account_id
+           WHERE a.test_code = $1 AND a.submitted_at IS NOT NULL
+           ORDER BY a.submitted_at DESC LIMIT 300""", code)
+    items = []
+    for r in rows:
+        review, ok = checking.grade(test["key"], r["answers"], r["accepted"])
+        # Yozilgan, lekin xato deb olingan yozma javoblar: o'qituvchi ko'rib chiqishi mumkin.
+        check = sum(1 for q in review if q["w"] and not q["ok"] and (q["my"] or "").strip())
+        items.append({"id": r["id"], "name": r["name"], "ok": ok, "n": len(review), "check": check,
+                      "at": r["submitted_at"].isoformat()})
+    return {"title": test["title"], "items": items}
+
+
+ATTEMPT_SQL = """SELECT a.id, a.answers, a.accepted, s.name, t.code, t.title, t.k, t.key
+FROM attempts a JOIN tests t ON t.code = a.test_code JOIN accounts s ON s.id = a.account_id
+WHERE a.id = $1 AND t.owner_id = $2 AND a.submitted_at IS NOT NULL"""
+
+
+def attempt_view(row, accepted: list[int]) -> dict:
+    review, ok = checking.grade(row["key"], row["answers"], accepted)
+    return {"id": row["id"], "name": row["name"], "code": row["code"], "title": row["title"], "k": row["k"],
+            "ok": ok, "n": len(review), "review": review}
+
+
+@router.get("/api/my/attempts/{attempt_id}")
+async def attempt_detail(attempt_id: int, acc=Depends(auth.teacher)):
+    row = await db.pool.fetchrow(ATTEMPT_SQL, attempt_id, acc["id"])
+    if not row:
+        raise HTTPException(404, "Natija topilmadi.")
+    return attempt_view(row, row["accepted"])
+
+
+class Mark(BaseModel):
+    index: int = Field(ge=0, le=99)
+    ok: bool
+
+
+@router.post("/api/my/attempts/{attempt_id}/mark")
+async def mark(attempt_id: int, body: Mark, acc=Depends(auth.teacher)):
+    async with db.pool.acquire() as conn, conn.transaction():
+        row = await conn.fetchrow(ATTEMPT_SQL + " FOR UPDATE OF a", attempt_id, acc["id"])
+        if not row:
+            raise HTTPException(404, "Natija topilmadi.")
+        review, _ = checking.grade(row["key"], row["answers"], [])
+        if body.index >= len(review):
+            raise HTTPException(400, "Bunday savol yoʻq.")
+        q = review[body.index]
+        if not q["w"] or q["auto"] or not (q["my"] or "").strip():
+            raise HTTPException(400, "Faqat xato deb olingan yozma javobni oʻzgartirish mumkin.")
+        accepted = set(row["accepted"]) - {body.index}
+        if body.ok:
+            accepted.add(body.index)
+        view = attempt_view(row, sorted(accepted))
+        await conn.execute("UPDATE attempts SET accepted = $1, ok = $2 WHERE id = $3",
+                           sorted(accepted), view["ok"], attempt_id)
+    return view
 
 
 class Open(BaseModel):

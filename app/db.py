@@ -64,6 +64,8 @@ CREATE TABLE IF NOT EXISTS attempts(
   ok INT
 );
 CREATE INDEX IF NOT EXISTS attempts_account ON attempts(account_id, test_code);
+-- O'qituvchi to'g'ri deb qabul qilgan yozma javoblar (savol tartib raqamlari).
+ALTER TABLE attempts ADD COLUMN IF NOT EXISTS accepted JSONB NOT NULL DEFAULT '[]';
 CREATE TABLE IF NOT EXISTS ratings(
   account_id INT NOT NULL REFERENCES accounts(id),
   test_code TEXT NOT NULL REFERENCES tests(code) ON DELETE CASCADE,
@@ -90,7 +92,7 @@ pool: asyncpg.Pool | None = None
 
 
 async def _init_conn(conn):
-    await conn.set_type_codec("jsonb", schema="pg_catalog", encoder=json.dumps, decoder=json.loads)
+    await conn.set_type_codec("jsonb", schema="pg_catalog", encoder=lambda v: json.dumps(v, ensure_ascii=False), decoder=json.loads)
 
 
 async def connect():

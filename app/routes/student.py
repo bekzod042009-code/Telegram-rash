@@ -109,7 +109,7 @@ async def start(code: str, acc=Depends(auth.student)):
                 "INSERT INTO attempts(account_id, test_code) VALUES ($1, $2) RETURNING id",
                 acc["id"], test["code"])
             left = seconds
-    questions = [{"t": q["t"], "img": q["img"], "w": q["w"]} for q in test["key"]]
+    questions = [{"t": q["t"], "img": q["img"], "opts": q.get("opts", []), "w": q["w"]} for q in test["key"]]
     return {**card(test), "attempt": attempt_id, "left": int(left), "questions": questions}
 
 
@@ -132,13 +132,7 @@ async def submit(attempt_id: int, body: Submit, acc=Depends(auth.student)):
         test = await find_test(conn, attempt["test_code"])
         if attempt["used"] > test["minutes"] * 60 + GRACE:
             raise HTTPException(410, "Vaqt tugagan, javoblar qabul qilinmadi. Testni qayta boshlang.")
-        review, ok = [], 0
-        for i, q in enumerate(test["key"]):
-            mine = body.answers[i] if i < len(body.answers) else None
-            right = checking.check(mine or "", q["acc"], q["md"]) if q["w"] else mine == q["a"]
-            ok += right
-            review.append({"t": q["t"], "img": q["img"], "w": q["w"], "a": q["a"], "acc": q["acc"],
-                           "my": mine, "ok": right})
+        review, ok = checking.grade(test["key"], body.answers, [])
         await conn.execute(
             "UPDATE attempts SET submitted_at = now(), answers = $1, ok = $2 WHERE id = $3",
             body.answers, ok, attempt_id)
