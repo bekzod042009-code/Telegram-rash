@@ -210,13 +210,13 @@ function pkB(){return '<div class="pk">'+CFG.pk.map(function(p){return '<button 
 async function ask(type,v){
   try{
     var d=await api("POST","/api/requests",{type:type,amount:type==="topup"?v:0,credits:type==="pack"?v:0});
-    setAcc(d.account);await (role==="t"?acctV():balV());toast("Ariza yuborildi. Admin javobini kuting.",false,true);
+    setAcc(d.account);await (role==="t"?acctV():balV());toast("Ariza yuborildi. 1 soat ichida javob olasiz.",false,true);
   }catch(e){fail(e)}
 }
 function reqName(r){return r.type==="pack"?r.credits+" kredit · "+fmt(r.amount)+" soʻm":(r.type==="topup"?"Balans toʻldirish: ":"Pul yechish: ")+fmt(r.amount)+" soʻm"}
 function reqList(a){
   if(!a.length)return '<p class="lead">Ariza yoʻq.</p>';
-  return a.map(function(r){return '<div class="card"><b>'+reqName(r)+'</b><small>'+{new:"Kutilmoqda",done:"Tasdiqlandi",rejected:"Rad etildi"}[r.status]+'</small></div>'}).join("");
+  return a.map(function(r){return '<div class="card"><b>'+reqName(r)+'</b><small>'+{new:"Kutilmoqda · 1 soat ichida javob olasiz",done:"Tasdiqlandi",rejected:"Rad etildi"}[r.status]+'</small></div>'}).join("");
 }
 function st(t){return t.votes?"★ "+t.rating.toFixed(1)+" ("+t.votes+")":"Baholanmagan"}
 function ptx(t){return t.pay==="c"?t.price+" kredit":fmt(t.price)+" soʻm"}
