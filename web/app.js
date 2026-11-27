@@ -18,10 +18,10 @@ async function api(method,url,body){
   return d;
 }
 function fail(e){toast(e.message,false)}
-function setAcc(a){ME.accounts[a.role]=a;if(role===a.role)me=a;head()}
+function setAcc(a){ME.accounts[a.role]=a;if(role===a.role)me=a;updHeader()}
 async function refresh(){
   ME=await api("GET","/api/me");CFG=ME.cfg;SUBJ=ME.subjects;
-  if(role&&role!=="a")me=ME.accounts[role];head();updTexts();
+  if(role&&role!=="a")me=ME.accounts[role];updHeader();updTexts();
 }
 
 /* ----- bildirishnoma ----- */
@@ -53,15 +53,15 @@ function enter(){
   var m={t:"T",s:"S",a:"A"};$("sRole").classList.add("hide");
   ["T","S","A"].forEach(function(x){$("s"+x).classList.toggle("hide",m[role]!==x)});
   if(role==="t"&&fin)again();
-  pane(role,PN[role][0]);head();refresh().catch(fail);
+  pane(role,PN[role][0]);updHeader();refresh().catch(fail);
 }
-function head(){
+function updHeader(){
   $("hx").classList.toggle("hide",!role);
   $("hr").textContent=role==="a"?"Admin":!me?"":me.name+" · "+(role==="t"?me.cr+" kredit":me.cr+" kredit · "+fmt(me.bal)+" soʻm");
 }
 function logout(){
   hideAll();me=null;role=null;hideToast();["T","S","A"].forEach(function(x){$("s"+x).classList.add("hide")});
-  $("sRole").classList.remove("hide");backR();head();barS();
+  $("sRole").classList.remove("hide");backR();updHeader();barS();
 }
 function pane(r,p){
   PN[r].forEach(function(x){$("p_"+r+"_"+x).classList.toggle("hide",x!==p);$("tb_"+r+"_"+x).classList.toggle("on",x===p)});
