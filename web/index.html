@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rash yordamchi</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+<div class="app">
+  <header><b>Rash yordamchi</b><button class="lnk hide" id="hx" onclick="logout()">Chiqish</button></header>
+  <div class="info" id="hr"></div>
+
+  <!-- KIRISH -->
+  <section id="sRole">
+    <div id="r1">
+      <h1>Xush kelibsiz</h1>
+      <p class="lead">Rolingizni tanlang. Telegram ID Telegramdan avtomatik olinadi.</p>
+      <p class="err" id="boot">Yuklanmoqda…</p>
+      <div class="rc hide" id="rc">
+        <button onclick="pickR('s')">Test yechuvchiman<small id="sm_s"></small></button>
+        <button onclick="pickR('t')">Test yaratuvchiman<small id="sm_t"></small></button>
+      </div>
+      <button class="lnk hide" id="adm" onclick="admin()">Admin</button>
+    </div>
+    <div id="r2" class="hide">
+      <button class="lnk" onclick="backR()">← Orqaga</button>
+      <h1 id="r2t"></h1>
+      <p class="lead">Ism va familiyangizni kiriting.</p>
+      <label for="fn">Ism</label><input id="fn" placeholder="Masalan, Dilnoza">
+      <label for="ln">Familiya</label><input id="ln" placeholder="Masalan, Karimova">
+      <p class="err" id="rerr"></p>
+      <div style="height:12px"></div><button class="cta" id="lb" onclick="login()">Davom etish</button>
+    </div>
+  </section>
+
+  <!-- OQITUVCHI -->
+  <section id="sT" class="hide">
+    <div class="tabs">
+      <button id="tb_t_create" class="on" onclick="pane('t','create')">Yaratish</button>
+      <button id="tb_t_mine" onclick="pane('t','mine')">Testlarim</button>
+      <button id="tb_t_acct" onclick="pane('t','acct')">Hisob</button>
+    </div>
+    <div id="p_t_create">
+      <div class="tabs" style="margin-top:0">
+        <button id="mO" class="on" onclick="mode(0)">Oddiy test</button>
+        <button id="mB" onclick="mode(1)">Bosma test</button>
+      </div>
+      <div id="form">
+        <h1 id="ft"></h1><p class="lead" id="fl"></p>
+        <label for="nom">Test nomi</label><input id="nom" placeholder="Masalan, Biologiya — yakuniy">
+        <div id="turBox"><label for="tur">Test turi</label><select id="tur" onchange="updTur()"><option value="o">Oʻz oʻquvchilarim</option><option value="p">Pullik testlar</option></select></div>
+        <div id="payBox" class="hide">
+          <label for="subj">Qaysi fanga moʻljallangan?</label><select id="subj"></select>
+          <div class="two">
+            <div><label for="pay">Qaysi birida sotasiz?</label><select id="pay" onchange="updPay()"><option value="m">Soʻmda</option><option value="c">Kreditda</option></select></div>
+            <div><label for="narx" id="nl">Narx (soʻm)</label><input id="narx" type="number" min="0" value="10000" inputmode="numeric"></div>
+          </div>
+        </div>
+        <div class="two">
+          <div><label for="kir">Kirish</label><select id="kir"><option>Ochiq</option><option>Yopiq</option></select></div>
+          <div><label for="vaqt">Vaqt (daqiqa)</label><input id="vaqt" type="number" min="1" value="30" inputmode="numeric"></div>
+          <div><label for="soni">Savollar soni</label><input id="soni" type="number" min="1" max="100" value="10" inputmode="numeric"></div>
+          <div><label for="var">Variantlar</label><select id="var"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option></select></div>
+        </div>
+        <h2>Savollar va toʻgʻri javoblar</h2>
+        <div class="panel" id="rows"></div>
+      </div>
+      <div id="done" class="hide">
+        <h1>Test yuklandi</h1><p class="lead" id="dl"></p>
+        <div class="code" id="kod"></div>
+        <button class="cta" onclick="copyCode()" id="cp">Kodni nusxalash</button>
+        <button class="cta alt" onclick="toStudent()">Oʻquvchi sifatida sinash</button>
+        <button class="cta alt" onclick="again()">Yangi test yaratish</button>
+      </div>
+    </div>
+    <div id="p_t_mine" class="hide"></div>
+    <div id="p_t_acct" class="hide"></div>
+  </section>
+
+  <!-- OQUVCHI -->
+  <section id="sS" class="hide">
+    <div class="tabs">
+      <button id="tb_s_find" class="on" onclick="pane('s','find')">Topish</button>
+      <button id="tb_s_sec" onclick="pane('s','sec')">Boʻlimlar</button>
+      <button id="tb_s_bal" onclick="pane('s','bal')">Balans</button>
+      <button id="tb_s_res" onclick="pane('s','res')">Natijalar</button>
+    </div>
+    <div id="p_s_find">
+      <h1>Test qidirish</h1>
+      <p class="lead">Test kodini yoki fan nomini yozing. Masalan: RASH-204851 yoki tarix.</p>
+      <label for="kodin">Kod yoki fan</label><input id="kodin" placeholder="tarix" onkeydown="if(event.key==='Enter')findQ()">
+      <div style="height:12px"></div><button class="cta" onclick="findQ()">Qidirish</button>
+      <p class="err" id="serr"></p>
+      <div id="sres" style="margin-top:12px"></div>
+      <div id="buy" class="hide card"></div>
+      <div id="sTest" class="hide"><h2 id="sTitle"></h2><div class="timer" id="timer" role="timer"></div><div class="panel" id="sRows"></div><div style="height:14px"></div><button class="cta" id="sb" onclick="submitS()">Javoblarni yuborish</button></div>
+      <div id="sRes" class="hide">
+        <h2>Natija</h2><div class="big" id="sScore"></div><p class="lead" id="sPct"></p>
+        <div class="panel" id="sRv"></div>
+        <div id="rateBox"><h2>Testni baholang</h2><div id="stars"></div><p class="lead" id="rtxt"></p></div>
+        <button class="cta alt" onclick="showT(cur.code)">Qayta yechish</button>
+      </div>
+    </div>
+    <div id="p_s_sec" class="hide"></div>
+    <div id="p_s_bal" class="hide"></div>
+    <div id="p_s_res" class="hide"></div>
+  </section>
+
+  <!-- ADMIN -->
+  <section id="sA" class="hide">
+    <div class="tabs">
+      <button id="tb_a_tests" class="on" onclick="pane('a','tests')">Testlar</button>
+      <button id="tb_a_earn" onclick="pane('a','earn')">Daromad</button>
+      <button id="tb_a_price" onclick="pane('a','price')">Narxlar</button>
+      <button id="tb_a_users" onclick="pane('a','users')">Foydalanuvchi</button>
+    </div>
+    <div id="p_a_tests"></div><div id="p_a_earn" class="hide"></div><div id="p_a_price" class="hide"></div><div id="p_a_users" class="hide"></div>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="alert"><span id="tmsg"></span><button id="tj" onclick="jump()">Koʻrsatish</button></div>
+<div class="bar hide" id="bar"><div>
+  <div class="prog"><span id="pt"></span><span id="pp"></span></div>
+  <div class="track"><i id="pf"></i></div>
+  <button class="cta" id="ub" onclick="upload()">Yuklash</button>
+</div></div>
+
+<input type="file" id="file" accept="image/*" class="hide">
+<div class="zoom hide" id="zoom"><button class="cta" onclick="unzoom()">Yopish</button><img id="zimg" alt="Savol rasmi" onclick="this.classList.toggle('max')"></div>
+<script src="app.js"></script>
+</body>
+</html>
