@@ -70,9 +70,7 @@ class Question(BaseModel):
     acc: list[str] = Field(default_factory=list, max_length=20)
     md: Literal["key", "exact", "fuzzy"] = "key"
     opts: list[str] = Field(default_factory=list, max_length=6)
-    part: Literal["", "a", "b"] = ""
-    ball: float = 0
-    max: float = Field(default=0, ge=0, le=100)
+    part: Literal["", "a", "b", "c", "d", "e", "f"] = ""
 
 
 class NewTest(BaseModel):
@@ -104,12 +102,19 @@ def layout(body: NewTest) -> list[dict]:
     for slot in tpl["slots"]:
         if pos >= len(body.questions):
             raise wrong
-        parts = ["a", "b"] if slot["type"] == "o" and body.questions[pos].part == "a" else [""]
+        parts = [""]
+        if slot["type"] == "o" and body.questions[pos].part == "a":
+            # Ochiq savolda a, b, ... bandlar ketma-ket keladi.
+            parts = []
+            for letter in "abcdef":
+                if pos + len(parts) >= len(body.questions) or body.questions[pos + len(parts)].part != letter:
+                    break
+                parts.append(letter)
         for part in parts:
-            if pos >= len(body.questions) or body.questions[pos].part != part:
+            if body.questions[pos].part != part:
                 raise wrong
             out.append({"label": f"{slot['n']}{part}", "type": slot["type"], "sec": slot["sec"],
-                        "k": slot["k"], "cont": part == "b"})
+                        "k": slot["k"], "cont": part not in ("", "a"), "max": slot.get("max", 0)})
             pos += 1
     if pos != len(body.questions):
         raise wrong
@@ -121,16 +126,14 @@ def build_key(body: NewTest) -> list[dict]:
     for q, meta in zip(body.questions, layout(body)):
         name, kind, k = meta["label"], meta["type"], meta["k"]
         written = q.w if kind == "free" else kind in ("o", "m")
-        # b band matni a band bilan birga beriladi.
+        # Keyingi bandlar matni a band bilan birga beriladi.
         text = "" if body.printed else q.t.strip()
         img = None if body.printed else q.img
         if not body.printed and not meta["cont"] and not text and not img:
             raise HTTPException(400, f"{name}-savolda matn yoki rasm yoʻq.")
-        accepted, options, answer, ball, most = [], [], None, 0, 0
+        accepted, options, answer, most = [], [], None, 0
         if kind == "m":
-            most = round(q.max, 1)
-            if most <= 0:
-                raise HTTPException(400, f"{name}-savolda maksimal ball kiritilmagan.")
+            most = meta["max"]
         elif written:
             accepted = [a.strip() for a in q.acc if checking.norm(a)]
             if not accepted or any(len(a) > 200 for a in accepted):
@@ -147,10 +150,8 @@ def build_key(body: NewTest) -> list[dict]:
                 # Rasmli savolda variantlar rasmning ichida bo'lishi mumkin.
                 if not img and not all(options):
                     raise HTTPException(400, f"{name}-savolda variant matni yoʻq.")
-        if body.tpl and not most:
-            ball = q.ball if q.ball in templates.Y1_BALLS else 2.2
         key.append({"t": text, "img": img, "w": written, "a": answer, "acc": accepted, "md": q.md, "opts": options,
-                    "label": name, "sec": meta["sec"], "k": k, "ball": ball, "max": most})
+                    "label": name, "sec": meta["sec"], "k": k, "max": most})
     return key
 
 

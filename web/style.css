@@ -110,11 +110,30 @@ span.b{cursor:default}
 .card.click .tbad{display:block}
 /* milliy qoliplar */
 .num{width:auto;min-width:28px;flex:none}
-.sec{font-size:13px;font-weight:700;color:var(--mute);text-transform:uppercase;padding:14px 0 2px}
-.mini{display:flex;align-items:center;gap:8px;margin:8px 0 0;font-size:13px;color:var(--mute)}
-.mini select{width:auto;padding:7px 10px;font-size:14px}
 .essay{flex:1;min-width:0;min-height:180px}
 .ans{white-space:pre-wrap;overflow-wrap:anywhere;margin-bottom:6px}
 .sl{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);font-size:15px}
 .sl b{white-space:nowrap}
 .card small.inl{display:inline;font-size:18px}
+/* ochiq savol */
+.qn{font-weight:700;color:var(--blue);margin:2px 0 8px}
+.row.miss .qn{color:var(--red)}
+.q.full{margin-left:0}
+.cnt{display:flex;align-items:center;gap:6px;color:var(--mute)}
+.cnt span{flex:1}
+.cnt button{width:40px;height:40px;border-radius:50%;border:1.5px solid var(--line);background:#fff;color:var(--ink);font:inherit;font-size:20px;cursor:pointer}
+.cnt button:disabled{opacity:.35;cursor:default}
+.cnt b{min-width:32px;text-align:center;color:var(--ink)}
+.abc{letter-spacing:.04em;margin:2px 0 0}
+.keys{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px}
+.keys p{margin:0;color:var(--blue);font-weight:700;font-size:14px}
+.vn{font-weight:600;font-size:14px;margin:10px 0 4px}
+.ak{display:flex;align-items:center;gap:8px;margin-top:6px}
+.ak input{flex:1;min-width:0;background:#fff}
+.ak button{width:40px;height:40px;flex:none;border:0;background:none;color:var(--red);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.ak button svg{width:20px;height:20px}
+.row.miss .ak input{border-color:var(--red)}
+.addans{display:block;font-size:14px}
+.answers{flex:1;min-width:0;display:grid;gap:8px}
+.answers label{display:flex;align-items:center;gap:8px;margin:0}
+.answers input{flex:1;min-width:0}

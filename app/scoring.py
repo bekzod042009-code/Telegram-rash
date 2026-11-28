@@ -1,4 +1,4 @@
-"""Xom ball, Rash modeli (0-75) va sertifikat darajalari."""
+"""Rash modeli (0-75) va sertifikat darajalari."""
 import math
 
 from . import checking, templates
@@ -104,8 +104,6 @@ def summary(tpl: str, review: list[dict], cal: dict) -> dict:
     auto = [q for q in review if not q["max"]]
     manual = [q for q in review if q["max"]]
     out = {"people": cal["people"], "need": MIN_PEOPLE,
-           "raw": round(sum(q["ball"] for q in auto if q["ok"]), 1),
-           "raw_max": round(sum(q["ball"] for q in auto), 1),
            "parts": [], "written": None, "final": None, "level": None, "otm": None}
     if manual:
         pending = sum(1 for q in manual if q["got"] is None)

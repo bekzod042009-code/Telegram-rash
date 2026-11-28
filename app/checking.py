@@ -87,5 +87,5 @@ def grade(key: list[dict], answers: list, accepted: list[int], scores: dict | No
         review.append({"t": q["t"], "img": q["img"], "opts": q.get("opts", []), "w": q["w"], "a": q["a"],
                        "acc": q["acc"], "my": mine, "auto": auto, "manual": manual, "ok": ok,
                        "label": q.get("label") or str(i + 1), "sec": q.get("sec", ""), "k": q.get("k"),
-                       "ball": q.get("ball", 0), "max": most, "got": got})
+                       "max": most, "got": got})
     return review, total
