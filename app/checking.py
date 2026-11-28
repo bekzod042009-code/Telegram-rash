@@ -12,11 +12,29 @@ ROMAN = {"ii": 2, "iii": 3, "iv": 4, "v": 5, "vi": 6, "vii": 7, "viii": 8, "ix":
          "xii": 12, "xiii": 13, "xiv": 14, "xv": 15, "xvi": 16, "xvii": 17, "xviii": 18, "xix": 19, "xx": 20}
 APOSTROPHES = re.compile("[ʻʼ'‘’`´]")
 
+# Son ichidagi belgilar vaqtincha almashtiriladi, tinish belgilari tozalanganda yo'qolmasligi uchun.
+MINUS, POINT, SLASH = "\ue000", "\ue001", "\ue002"
+# Manfiy ishora: boshida yoki = ( [ { | : ; dan keyin ("- 5" ham), yoki bo'shliqdan keyin raqamga yopishgan.
+# "5-asr", "1941-1945" kabi chiziqcha ishora hisoblanmaydi.
+SIGN = re.compile(r"(^\s*|[=(\[{|:;]\s*)[-−–]\s*(?=[0-9])|(\s)[-−–](?=[0-9])")
+# Bitta ajratgichli son: "2,5" yoki "2.5" ("1,2,3" va sanalar bunga kirmaydi).
+DECIMAL = re.compile(r"(?<![0-9])(?<![0-9][.,])([0-9]+)[.,]([0-9]+)(?![0-9]|[.,][0-9])")
+FRACTION = re.compile(r"(?<![0-9/])([0-9]+)\s*/\s*(?=[0-9]+(?![0-9]|\s*/))")
+
+
+def _decimal(m: re.Match) -> str:
+    tail = m.group(2).rstrip("0")  # 2,50 = 2,5 va 5,0 = 5
+    return m.group(1) + (POINT + tail if tail else "")
+
 
 def norm(s: str) -> list[str]:
     s = APOSTROPHES.sub("", str(s).lower())
     s = "".join(CYR.get(c, c) for c in s)
-    words = re.sub(r"[^a-z0-9\s]", " ", s).split()
+    s = SIGN.sub(lambda m: (m.group(1) or m.group(2) or "") + " " + MINUS, s)
+    s = DECIMAL.sub(_decimal, s)
+    s = FRACTION.sub(lambda m: m.group(1) + SLASH, s)
+    s = re.sub(rf"[^a-z0-9\s{MINUS}{POINT}{SLASH}]", " ", s)
+    words = s.replace(MINUS, "-").replace(POINT, ".").replace(SLASH, "/").split()
     out = []
     for w in words:
         m = re.fullmatch(r"([0-9]+)(chi|nchi|inchi)", w)
@@ -41,6 +59,10 @@ def lev(a: str, b: str) -> int:
     return prev[-1]
 
 
+def _numbers(words: list[str]) -> list[str]:
+    return [w for w in words if any(c.isdigit() for c in w)]
+
+
 def check(answer: str, accepted: list[str], mode: str) -> bool:
     words = norm(answer)
     if not words:
@@ -57,7 +79,9 @@ def check(answer: str, accepted: list[str], mode: str) -> bool:
             ok = all(w in words for w in t)
         else:
             limit = 0 if len(tj) <= 4 else 1 if len(tj) <= 8 else 2
-            ok = abs(len(joined) - len(tj)) <= limit and lev(joined, tj) <= limit
+            # Imlo bardoshliligi sonlarga tegishli emas.
+            ok = (_numbers(words) == _numbers(t) and abs(len(joined) - len(tj)) <= limit
+                  and lev(joined, tj) <= limit)
         if ok:
             return True
     return False
