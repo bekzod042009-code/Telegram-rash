@@ -4,8 +4,8 @@ var ME=null,CFG=null,SUBJ=[],me=null,role=null,pend=null,S,mk=[],printed=false,o
 var cur=null,sa=[],seq=0,timerId=null,deadline=0,sending=false,pickIdx=0,toastId=null;
 var PN={t:["create","mine","acct"],s:["find","sec","bal","res"],a:["tests","earn","price","users"]};
 var fmt=function(n){return Math.round(n).toLocaleString("ru-RU")};
-function newS(){S={n:10,k:4,tpl:"",meta:[],ans:[],w:[],acc:[],md:[],txt:[],img:[],opt:[]};mk=[]}newS();
-var ARR=["meta","ans","w","acc","md","txt","img","opt"];
+function newS(){S={n:10,k:4,tpl:"",meta:[],ans:[],w:[],acc:[],md:[],txt:[],img:[],opt:[],need:[]};mk=[]}newS();
+var ARR=["meta","ans","w","acc","md","txt","img","opt","need"];
 function K(i){return S.tpl?S.meta[i].k:S.k}
 function kind(i){return S.tpl?S.meta[i].type:"free"}
 function lab(i){return S.tpl?S.meta[i].n+S.meta[i].part:String(i+1)}
@@ -92,19 +92,21 @@ function mode(m){
 function updTur(){$("payBox").classList.toggle("hide",!($("tur").value==="p"&&!printed))}
 function updPay(){var c=$("pay").value==="c";$("nl").textContent=c?"Narx (kredit)":"Narx (soʻm)";$("narx").value=c?10:10000}
 /* ----- qoliplar ----- */
-function entry(s,part){return{meta:{n:s.n,type:s.type,sec:s.sec,k:s.k,part:part},ans:null,w:s.type==="o",acc:[],md:"key",txt:"",img:null,opt:["","","","","",""]}}
+function entry(s,part){return{meta:{n:s.n,type:s.type,sec:s.sec,k:s.k,part:part},ans:null,w:s.type==="o",acc:[],md:"key",txt:"",img:null,opt:["","","","","",""],need:false}}
 function fillTpl(id){
   S.img.forEach(dropImg);newS();S.tpl=id;
   if(id)CFG.tpl[id].slots.forEach(function(s){(s.parts===2?["a","b"]:[""]).forEach(function(p){var e=entry(s,p);ARR.forEach(function(a){S[a].push(e[a])})})});
   $("vaqt").value=id?CFG.tpl[id].min:30;$("soni").value=10;$("tpl").value=id;
+  $("impmsg").textContent="";$("ptext").classList.add("hide");
   Array.prototype.forEach.call(document.querySelectorAll(".freeOnly"),function(el){el.classList.toggle("hide",!!id)});
   hideToast();render();
 }
+function isFilled(){return S.ans.some(function(a){return a!==null})||S.txt.some(Boolean)||S.img.some(Boolean)||S.acc.some(function(a){return a.length})||S.opt.some(function(o){return o.some(Boolean)})}
+function confirmBox(q,done){if(tg&&tg.showConfirm&&tg.isVersionAtLeast&&tg.isVersionAtLeast("6.2"))tg.showConfirm(q,done);else done(window.confirm(q))}
 function setTpl(id){
-  var old=S.tpl,filled=S.ans.some(function(a){return a!==null})||S.txt.some(Boolean)||S.img.some(Boolean)||S.acc.some(function(a){return a.length});
-  if(!filled)return fillTpl(id);
-  var q="Qolip almashtirilsa, kiritilgan savollar oʻchadi. Davom etilsinmi?",done=function(ok){if(ok)fillTpl(id);else $("tpl").value=old};
-  if(tg&&tg.showConfirm&&tg.isVersionAtLeast&&tg.isVersionAtLeast("6.2"))tg.showConfirm(q,done);else done(window.confirm(q));
+  var old=S.tpl;
+  if(!isFilled())return fillTpl(id);
+  confirmBox("Qolip almashtirilsa, kiritilgan savollar oʻchadi. Davom etilsinmi?",function(ok){if(ok)fillTpl(id);else $("tpl").value=old});
 }
 /* Ochiq savoldagi javoblar (bandlar) soni: 1–6. */
 function setParts(i,d){
@@ -118,7 +120,7 @@ function setParts(i,d){
 function sync(){
   if(S.tpl){S.n=S.meta.length;return}
   var n=Math.max(1,Math.min(100,parseInt($("soni").value)||1));S.n=n;S.k=parseInt($("var").value);
-  while(S.ans.length<n){S.meta.push(null);S.ans.push(null);S.w.push(false);S.acc.push([]);S.md.push("key");S.txt.push("");S.img.push(null);S.opt.push(["","","","","",""])}
+  while(S.ans.length<n){S.meta.push(null);S.ans.push(null);S.w.push(false);S.acc.push([]);S.md.push("key");S.txt.push("");S.img.push(null);S.opt.push(["","","","","",""]);S.need.push(false)}
   S.ans=S.ans.map(function(a){return a!==null&&L.indexOf(a)>=S.k?null:a});
 }
 function valid(a){return /[a-z0-9Ѐ-ӿ]/i.test(a)}
@@ -126,7 +128,7 @@ function ansOk(i){if(kind(i)==="m")return true;return S.w[i]?S.acc[i].some(valid
 function optsOk(i){for(var j=0;j<K(i);j++)if(!S.opt[i][j].trim())return false;return true}
 /* Rasmli savolda variantlar rasm ichida boʻlishi mumkin, shuning uchun ularning matni shart emas. */
 function rowOk(i){if(isOpen(i))for(var p=1,n=parts(i);p<n;p++)if(!ansOk(i+p))return false;
-  return ansOk(i)&&(printed||(!!S.img[i]||S.txt[i].trim()!=="")&&(S.w[i]||kind(i)==="m"||!!S.img[i]||optsOk(i)))}
+  return ansOk(i)&&(printed||!(S.need[i]&&!S.img[i])&&(!!S.img[i]||S.txt[i].trim()!=="")&&(S.w[i]||kind(i)==="m"||!!S.img[i]||optsOk(i)))}
 function bubble(i,j){return '<button type="button" class="b'+(S.ans[i]===L[j]?' on':'')+'" aria-label="'+lab(i)+'-savol '+L[j]+' toʻgʻri javob" onclick="pick('+i+','+j+')">'+L[j]+'</button>'}
 function optRows(i){
   var h='<div class="opts">';
@@ -138,7 +140,7 @@ var TRASH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wid
 var ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>';
 function imgBox(i){
   var m=S.img[i];
-  if(!m)return '<button type="button" class="addimg" onclick="pickImg('+i+')">'+ICON+'Rasm qoʻshish</button>';
+  if(!m)return (S.need[i]?'<p class="need">Faylga koʻra bu savolda rasm bor.<button type="button" class="lnk" onclick="noImg('+i+')">Rasm kerak emas</button></p>':'')+'<button type="button" class="addimg" onclick="pickImg('+i+')">'+ICON+'Rasm qoʻshish</button>';
   if(m.busy)return '<div class="pic busy"><img src="'+m.url+'" alt=""><small>Rasm yuklanmoqda…</small></div>';
   return '<div class="pic"><img src="'+m.url+'" alt="'+lab(i)+'-savol rasmi" onclick="zoom(this.src)"><button type="button" class="lnk" onclick="pickImg('+i+')">Almashtirish</button><button type="button" class="lnk" onclick="delImg('+i+')">Olib tashlash</button></div>';
 }
@@ -146,6 +148,7 @@ function drawImg(i){var el=$("im"+i);if(el)el.innerHTML=imgBox(i);chk(i)}
 function pickImg(i){pickIdx=i;$("file").value="";$("file").click()}
 function dropImg(m){if(m&&m.id)api("DELETE","/api/images/"+m.id).catch(function(){})}
 function delImg(i){dropImg(S.img[i]);S.img[i]=null;drawImg(i)}
+function noImg(i){S.need[i]=false;drawImg(i)}
 /* Telefonda rasm kichraytirib yuboriladi. */
 function shrink(file){
   return new Promise(function(ok,no){
@@ -199,7 +202,7 @@ function render(fi){
     var t=kind(i);if(isB(i))continue;
     h+='<div class="row'+(mk.indexOf(i)>-1&&!rowOk(i)?' miss':'')+'" id="r'+i+'">';
     if(t==="o")h+='<div class="qn">'+qNum(i)+'-savol</div>';
-    if(!printed)h+='<div class="q'+(t==="o"?' full':'')+'"><textarea maxlength="2000" placeholder="'+qNum(i)+'-savol matni" oninput="S.txt['+i+']=this.value;chk('+i+')">'+esc(S.txt[i])+'</textarea><div id="im'+i+'">'+imgBox(i)+'</div></div>';
+    if(!printed)h+='<div class="q'+(t==="o"?' full':'')+'"><textarea class="qtx" maxlength="8000" placeholder="'+qNum(i)+'-savol matni" oninput="S.txt['+i+']=this.value;grow(this);chk('+i+')">'+esc(S.txt[i])+'</textarea><div id="im'+i+'">'+imgBox(i)+'</div></div>';
     if(t==="o"){h+=openBox(i)+'</div>';continue}
     h+='<div class="rl"><span class="num">'+lab(i)+'</span><div class="bub">';
     if(t==="m")h+='<span class="hint">Yozma ish · oʻqituvchi baholaydi</span>';
@@ -217,7 +220,7 @@ function render(fi){
     }
     h+='</div>';
   }
-  $("rows").innerHTML=h;prog();Array.prototype.forEach.call(document.querySelectorAll("#rows .opt textarea"),function(el){if(el.value)grow(el)});if(fi!==undefined&&$("in"+fi))$("in"+fi).focus();
+  $("rows").innerHTML=h;prog();Array.prototype.forEach.call(document.querySelectorAll("#rows .opt textarea,#rows .qtx"),function(el){if(el.value)grow(el)});if(fi!==undefined&&$("in"+fi))$("in"+fi).focus();
 }
 function chips(i){return S.acc[i].map(function(a,k){return '<span class="chip">'+esc(a)+'<button aria-label="Olib tashlash" onclick="rm('+i+','+k+')">×</button></span>'}).join("")}
 /* Faqat shu qator yangilanadi: toʻliq qayta chizish keyingi bosishni yoʻqotib qoʻyadi. */
@@ -233,7 +236,7 @@ function prog(){var d=0,n=0;for(var i=0;i<S.n;i++)if(!isB(i)){n++;if(rowOk(i))d+
   $("pt").textContent=d+" / "+n+" toʻldirildi";$("pp").textContent=p+"%";$("pf").style.width=p+"%"}
 function fix(){if(!mk.length)return;mk=mk.filter(function(i){return i<S.n&&!isB(i)&&!rowOk(i)});if(mk.length)showMiss();else hideToast()}
 function showMiss(){var m=mk.map(qNum);
-  toast(m.length+" ta savolda "+(printed?"javob belgilanmagan":"javob, matn yoki variant yetishmaydi")+": "+m.slice(0,6).join(", ")+(m.length>6?" …":""),true)}
+  toast(m.length+" ta savolda "+(printed?"javob belgilanmagan":"javob, matn, variant yoki rasm yetishmaydi")+": "+m.slice(0,6).join(", ")+(m.length>6?" …":""),true)}
 function jump(){if(mk.length)$("r"+mk[0]).scrollIntoView({behavior:"smooth",block:"center"})}
 async function upload(){
   sync();mk=[];var i,q=[];for(i=0;i<S.n;i++)if(!isB(i)&&!rowOk(i))mk.push(i);
@@ -254,7 +257,7 @@ async function upload(){
 }
 function copyText(t){try{navigator.clipboard.writeText(t)}catch(e){}}
 function copyCode(){copyText($("kod").textContent);$("cp").textContent="Nusxalandi";setTimeout(function(){$("cp").textContent="Kodni nusxalash"},1500)}
-function again(){S.img=[];fillTpl("");fin=false;$("nom").value="";$("done").classList.add("hide");$("form").classList.remove("hide");mode(printed?1:0);barS()}
+function again(){S.img=[];fillTpl("");fin=false;$("nom").value="";$("imp").open=false;$("done").classList.add("hide");$("form").classList.remove("hide");mode(printed?1:0);barS()}
 async function toStudent(){
   var c=$("kod").textContent;
   try{

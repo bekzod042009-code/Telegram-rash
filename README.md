@@ -54,6 +54,25 @@ Test yaratishda **fan** tanlanadi (`app/templates.py`). Huquqshunoslik uchun spe
 
 Ballar taxminiy, rasmiy natija farq qilishi mumkin.
 
+## Fayldan yuklash
+
+Yaratish → **Tayyor testni fayldan yuklash** (`web/import.js`).
+
+1. Fan tanlanadi, **AI uchun ko‘rsatma** nusxalanadi.
+2. Ko‘rsatma va PDF istalgan AI'ga yuboriladi.
+3. AI bergan JSON fayl tanlanadi yoki kodi joylanadi — forma to‘ladi.
+4. O‘qituvchi tekshiradi, rasmlarni qo‘shadi va **Yuklash**ni bosadi.
+
+Format:
+
+    {"fan": "mat", "nom": "Test nomi", "vaqt": 150, "savollar": [
+      {"n": 1, "matn": "...", "variantlar": ["...", "...", "...", "..."], "javob": "B", "rasm": false},
+      {"n": 36, "matn": "...", "javoblar": [["12"], ["0,5", "1/2"]]}
+    ]}
+
+`fan`: `""` (erkin test), `mat`, `fiz`, `kim`, `bio`, `ona`, `rus`, `qq`, `tar`, `geo`, `multi`.
+`javoblar`: har bir band (a, b, ...) uchun alohida ro‘yxat. `nom`, `vaqt`, `rasm` ixtiyoriy.
+
 ## Rasmlar
 
 Faqat oddiy testda. JPG, PNG, WEBP; telefonda kichraytiriladi (1600 px gacha) va bazada saqlanadi.

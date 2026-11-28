@@ -33,6 +33,7 @@ input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid v
 .b{width:40px;height:40px;border-radius:50%;border:1.5px solid var(--line);background:#fff;color:var(--blue);font:inherit;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
 .row.miss .b{border-color:var(--red);color:var(--red)}
 .b.on,.b.ok{background:var(--green);border-color:var(--green);color:#fff}
+.row.miss .b.on{border-color:var(--green);color:#fff}
 .b.bad{background:var(--red);border-color:var(--red);color:#fff}
 span.b{cursor:default}
 .okt{color:var(--green);font-weight:700}
@@ -137,3 +138,15 @@ span.b{cursor:default}
 .answers{flex:1;min-width:0;display:grid;gap:8px}
 .answers label{display:flex;align-items:center;gap:8px;margin:0}
 .answers input{flex:1;min-width:0}
+/* fayldan yuklash */
+.imp{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:0 14px;margin-top:12px}
+.imp summary{cursor:pointer;color:var(--blue);font-weight:700;padding:14px 0}
+.imp[open]{padding-bottom:14px}
+.imp textarea{background:#fff;margin-top:10px;font-size:13px}
+.imp label+textarea{margin-top:0}
+.impmsg{margin:12px 0 0;font-size:14px}
+.impmsg b{display:block;color:var(--blue)}
+.impmsg span{display:block;margin-top:4px;overflow-wrap:anywhere}
+.need{margin:8px 0 0;color:var(--red);font-size:14px}
+.need .lnk{margin-left:10px;font-size:14px}
+.qt{white-space:pre-wrap;overflow-wrap:anywhere}

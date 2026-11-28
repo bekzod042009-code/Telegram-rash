@@ -63,7 +63,7 @@ async def delete_image(image_id: str, acc=Depends(auth.teacher)):
 
 
 class Question(BaseModel):
-    t: str = Field(default="", max_length=2000)
+    t: str = Field(default="", max_length=8000)
     img: str | None = Field(default=None, max_length=64)
     w: bool = False
     a: str | None = Field(default=None, max_length=1)

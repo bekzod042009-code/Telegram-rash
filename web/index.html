@@ -50,6 +50,18 @@
       <div id="form">
         <h1 id="ft"></h1><p class="lead" id="fl"></p>
         <label for="tpl">Fanni tanlang</label><select id="tpl" onchange="setTpl(this.value)"><option value="">Erkin test</option></select>
+        <details class="imp" id="imp">
+          <summary>Tayyor testni fayldan yuklash</summary>
+          <p class="lead">Fanni tanlang, koʻrsatmani nusxalab PDF bilan birga AI'ga yuboring. AI bergan faylni yoki kodni shu yerga yuklang.</p>
+          <button type="button" class="cta alt" id="pcopy" onclick="copyPrompt()">1. AI uchun koʻrsatmani nusxalash</button>
+          <textarea id="ptext" class="hide" readonly aria-label="AI uchun koʻrsatma"></textarea>
+          <button type="button" class="cta alt" onclick="pickImport()">2. Faylni tanlash</button>
+          <input type="file" id="impfile" class="hide">
+          <label for="imptext">yoki AI bergan kodni joylang</label>
+          <textarea id="imptext" spellcheck="false" placeholder='{"fan": ...}'></textarea>
+          <button type="button" class="cta alt" onclick="importText($('imptext').value)">Kodni joylash</button>
+          <p id="impmsg" role="status"></p>
+        </details>
         <label for="nom">Test nomi</label><input id="nom" placeholder="Masalan, Biologiya — yakuniy">
         <div id="turBox"><label for="tur">Test turi</label><select id="tur" onchange="updTur()"><option value="o">Oʻz oʻquvchilarim</option><option value="p">Pullik testlar</option></select></div>
         <div id="payBox" class="hide">
@@ -131,5 +143,6 @@
 <input type="file" id="file" accept="image/*" class="hide">
 <div class="zoom hide" id="zoom"><button class="cta" onclick="unzoom()">Yopish</button><img id="zimg" alt="Savol rasmi" onclick="this.classList.toggle('max')"></div>
 <script src="app.js"></script>
+<script src="import.js"></script>
 </body>
 </html>
