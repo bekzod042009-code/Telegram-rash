@@ -37,6 +37,21 @@ Oddiy testda har bir variant uchun matn qatori bor (rasmli savolda ixtiyoriy).
 O‘qituvchi: Testlarim → Natijalar → o‘quvchi. Imlo xatosi sabab xato olingan yozma javobni
 **To‘g‘ri deb hisoblash** mumkin (bekor qilish ham bor).
 
+## Milliy sertifikat qoliplari
+
+Test yaratishda **Test qolipi** tanlanadi (`app/templates.py`). Huquqshunoslik uchun spetsifikatsiya yo‘q.
+
+* Xom ball: har savolga 1,3 / 2,2 / 3,2 (o‘qituvchi tanlaydi).
+* Rash (`app/scoring.py`): dixotomik model, T = 50 + 10Z, 0–75. Kamida 10 o‘quvchi kerak;
+  har birining birinchi urinishi olinadi.
+* Yozma ish va esse qo‘lda baholanadi: Testlarim → Natijalar → o‘quvchi.
+* Kimyo, biologiya, ona tili: yakuniy = (Rash + yozma 75 ballga keltirilgan) / 2.
+  Rasmiy birlashtirish formulasi spetsifikatsiyada yo‘q.
+* Chet tili: Listening, Reading, Writing, Speaking o‘rtachasi; Use of English alohida ko‘rsatiladi.
+  Audio yuklash hozircha yo‘q.
+
+Ballar taxminiy, rasmiy natija farq qilishi mumkin.
+
 ## Rasmlar
 
 Faqat oddiy testda. JPG, PNG, WEBP; telefonda kichraytiriladi (1600 px gacha) va bazada saqlanadi.
@@ -52,4 +67,4 @@ Faqat oddiy testda. JPG, PNG, WEBP; telefonda kichraytiriladi (1600 px gacha) va
 
 ## Hozircha yo‘q
 
-Click/Payme, Rasch / Z / T ball, 75 ballik yozma ish shkalasi.
+Click/Payme, Listening uchun audio.

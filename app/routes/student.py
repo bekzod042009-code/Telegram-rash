@@ -2,8 +2,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from .. import auth, checking, db
-from .shared import TESTS_SQL, account, card
+from .. import auth, checking, db, scoring
+from .shared import TESTS_SQL, account, calibration, card
 
 router = APIRouter()
 GRACE = 60  # soniya: sekin internet uchun
@@ -109,17 +109,19 @@ async def start(code: str, acc=Depends(auth.student)):
                 "INSERT INTO attempts(account_id, test_code) VALUES ($1, $2) RETURNING id",
                 acc["id"], test["code"])
             left = seconds
-    questions = [{"t": q["t"], "img": q["img"], "opts": q.get("opts", []), "w": q["w"]} for q in test["key"]]
+    questions = [{"t": q["t"], "img": q["img"], "opts": q.get("opts", []), "w": q["w"],
+                  "label": q.get("label") or str(i), "sec": q.get("sec", ""), "k": q.get("k") or test["k"],
+                  "max": q.get("max", 0)} for i, q in enumerate(test["key"], 1)]
     return {**card(test), "attempt": attempt_id, "left": int(left), "questions": questions}
 
 
 class Submit(BaseModel):
-    answers: list[str | None] = Field(max_length=100)
+    answers: list[str | None] = Field(max_length=120)
 
 
 @router.post("/api/attempts/{attempt_id}/submit")
 async def submit(attempt_id: int, body: Submit, acc=Depends(auth.student)):
-    if any(a and len(a) > 500 for a in body.answers):
+    if any(a and len(a) > 15000 for a in body.answers):
         raise HTTPException(400, "Javob juda uzun.")
     async with db.pool.acquire() as conn, conn.transaction():
         attempt = await conn.fetchrow(
@@ -132,13 +134,19 @@ async def submit(attempt_id: int, body: Submit, acc=Depends(auth.student)):
         test = await find_test(conn, attempt["test_code"])
         if attempt["used"] > test["minutes"] * 60 + GRACE:
             raise HTTPException(410, "Vaqt tugagan, javoblar qabul qilinmadi. Testni qayta boshlang.")
+        # Faqat yozma ish uzun bo'lishi mumkin.
+        if any(a and len(a) > 500 and not (i < len(test["key"]) and test["key"][i].get("max"))
+               for i, a in enumerate(body.answers)):
+            raise HTTPException(400, "Javob juda uzun.")
         review, ok = checking.grade(test["key"], body.answers, [])
         await conn.execute(
             "UPDATE attempts SET submitted_at = now(), answers = $1, ok = $2 WHERE id = $3",
             body.answers, ok, attempt_id)
         mine_rating = await conn.fetchval(
             "SELECT stars FROM ratings WHERE account_id = $1 AND test_code = $2", acc["id"], test["code"])
-    return {"ok": ok, "n": test["n"], "k": test["k"], "review": review, "my_rating": mine_rating or 0,
+        cal = await calibration(conn, test["code"])
+    return {"score": scoring.summary(test["tpl"], review, cal) if cal else None,
+            "ok": ok, "n": sum(1 for q in review if not q["max"]), "k": test["k"], "review": review, "my_rating": mine_rating or 0,
             "can_rate": test["owner_tg"] != acc["tg_id"]}
 
 
@@ -167,7 +175,17 @@ async def rate(code: str, body: Rating, acc=Depends(auth.student)):
 @router.get("/api/results")
 async def results(acc=Depends(auth.student)):
     rows = await db.pool.fetch(
-        """SELECT t.title, t.code, t.n, a.ok FROM attempts a JOIN tests t ON t.code = a.test_code
+        """SELECT t.title, t.code, t.tpl, t.key, a.answers, a.accepted, a.scores
+           FROM attempts a JOIN tests t ON t.code = a.test_code
            WHERE a.account_id = $1 AND a.submitted_at IS NOT NULL
            ORDER BY a.submitted_at DESC LIMIT 100""", acc["id"])
-    return [dict(r) for r in rows]
+    cals, out = {}, []
+    for r in rows:
+        review, ok = checking.grade(r["key"], r["answers"], r["accepted"], r["scores"])
+        if r["code"] not in cals:
+            cals[r["code"]] = await calibration(db.pool, r["code"])
+        cal = cals[r["code"]]
+        out.append({"title": r["title"], "code": r["code"], "ok": ok,
+                    "n": sum(1 for q in review if not q["max"]),
+                    "score": scoring.summary(r["tpl"], review, cal) if cal else None})
+    return out

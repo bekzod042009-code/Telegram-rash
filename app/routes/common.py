@@ -4,7 +4,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
-from .. import auth, bot, config, db
+from .. import auth, bot, config, db, templates
 from .shared import account, request_row
 
 router = APIRouter()
@@ -17,7 +17,7 @@ async def me(user: dict = Depends(auth.tg_user)):
     accounts = {r["role"]: account(r) for r in rows}
     return {"tg_id": user["id"], "first_name": user.get("first_name", ""), "last_name": user.get("last_name", ""),
             "is_admin": user["id"] in config.ADMIN_IDS, "accounts": accounts,
-            "cfg": await db.settings(), "subjects": config.SUBJECTS,
+            "cfg": await db.settings(), "subjects": config.SUBJECTS, "templates": templates.TEMPLATES,
             "bot": bot.username, "payment_info": config.PAYMENT_INFO}
 
 

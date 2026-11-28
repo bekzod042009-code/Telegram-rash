@@ -63,15 +63,29 @@ def check(answer: str, accepted: list[str], mode: str) -> bool:
     return False
 
 
-def grade(key: list[dict], answers: list, accepted: list[int]) -> tuple[list[dict], int]:
-    """Har bir savol bo'yicha natija: avtomatik tekshiruv + o'qituvchi qabul qilganlari."""
+def grade(key: list[dict], answers: list, accepted: list[int], scores: dict | None = None) -> tuple[list[dict], int]:
+    """Har bir savol bo'yicha natija: avtomatik tekshiruv + o'qituvchi qabul qilganlari.
+
+    Yozma ish (max > 0) avtomatik tekshirilmaydi: bali scores ichida bo'ladi.
+    """
     review, total = [], 0
     for i, q in enumerate(key):
         mine = answers[i] if i < len(answers) else None
-        auto = check(mine or "", q["acc"], q["md"]) if q["w"] else mine == q["a"]
-        manual = bool(q["w"] and not auto and i in accepted)
-        ok = auto or manual
+        most = q.get("max") or 0
+        if most:
+            auto = manual = ok = False
+            # Javobsiz yozma ish 0 ball; Speaking ilovadan tashqarida topshiriladi.
+            got = (scores or {}).get(str(i))
+            if got is None and not (mine or "").strip() and q.get("sec") != "Speaking":
+                got = 0
+        else:
+            got = None
+            auto = check(mine or "", q["acc"], q["md"]) if q["w"] else mine == q["a"]
+            manual = bool(q["w"] and not auto and i in accepted)
+            ok = auto or manual
         total += ok
         review.append({"t": q["t"], "img": q["img"], "opts": q.get("opts", []), "w": q["w"], "a": q["a"],
-                       "acc": q["acc"], "my": mine, "auto": auto, "manual": manual, "ok": ok})
+                       "acc": q["acc"], "my": mine, "auto": auto, "manual": manual, "ok": ok,
+                       "label": q.get("label") or str(i + 1), "sec": q.get("sec", ""), "k": q.get("k"),
+                       "ball": q.get("ball", 0), "max": most, "got": got})
     return review, total

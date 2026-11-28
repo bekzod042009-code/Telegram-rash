@@ -49,6 +49,7 @@
       </div>
       <div id="form">
         <h1 id="ft"></h1><p class="lead" id="fl"></p>
+        <label for="tpl">Test qolipi</label><select id="tpl" onchange="setTpl(this.value)"><option value="">Erkin test (qolipsiz)</option></select>
         <label for="nom">Test nomi</label><input id="nom" placeholder="Masalan, Biologiya — yakuniy">
         <div id="turBox"><label for="tur">Test turi</label><select id="tur" onchange="updTur()"><option value="o">Oʻz oʻquvchilarim</option><option value="p">Pullik testlar</option></select></div>
         <div id="payBox" class="hide">
@@ -61,8 +62,8 @@
         <div class="two">
           <div><label for="kir">Kirish</label><select id="kir"><option>Ochiq</option><option>Yopiq</option></select></div>
           <div><label for="vaqt">Vaqt (daqiqa)</label><input id="vaqt" type="number" min="1" value="30" inputmode="numeric"></div>
-          <div><label for="soni">Savollar soni</label><input id="soni" type="number" min="1" max="100" value="10" inputmode="numeric"></div>
-          <div><label for="var">Variantlar</label><select id="var"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option></select></div>
+          <div class="freeOnly"><label for="soni">Savollar soni</label><input id="soni" type="number" min="1" max="100" value="10" inputmode="numeric"></div>
+          <div class="freeOnly"><label for="var">Variantlar</label><select id="var"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option></select></div>
         </div>
         <h2>Savollar va toʻgʻri javoblar</h2>
         <div class="panel" id="rows"></div>
@@ -97,7 +98,7 @@
       <div id="buy" class="hide card"></div>
       <div id="sTest" class="hide"><h2 id="sTitle"></h2><div class="timer" id="timer" role="timer"></div><div class="panel" id="sRows"></div><div style="height:14px"></div><button class="cta" id="sb" onclick="submitS()">Javoblarni yuborish</button></div>
       <div id="sRes" class="hide">
-        <h2>Natija</h2><div class="big" id="sScore"></div><p class="lead" id="sPct"></p>
+        <h2>Natija</h2><div class="big" id="sScore"></div><p class="lead" id="sPct"></p><div id="sBall"></div>
         <div class="panel" id="sRv"></div>
         <div id="rateBox"><h2>Testni baholang</h2><div id="stars"></div><p class="lead" id="rtxt"></p></div>
         <button class="cta alt" onclick="showT(cur.code)">Qayta yechish</button>

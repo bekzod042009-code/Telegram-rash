@@ -108,3 +108,13 @@ span.b{cursor:default}
 .optv span:last-child,.optb span:last-child{min-width:0;white-space:pre-wrap}
 .mark{margin-top:8px;padding:10px;font-size:14px}
 .card.click .tbad{display:block}
+/* milliy qoliplar */
+.num{width:auto;min-width:28px;flex:none}
+.sec{font-size:13px;font-weight:700;color:var(--mute);text-transform:uppercase;padding:14px 0 2px}
+.mini{display:flex;align-items:center;gap:8px;margin:8px 0 0;font-size:13px;color:var(--mute)}
+.mini select{width:auto;padding:7px 10px;font-size:14px}
+.essay{flex:1;min-width:0;min-height:180px}
+.ans{white-space:pre-wrap;overflow-wrap:anywhere;margin-bottom:6px}
+.sl{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);font-size:15px}
+.sl b{white-space:nowrap}
+.card small.inl{display:inline;font-size:18px}

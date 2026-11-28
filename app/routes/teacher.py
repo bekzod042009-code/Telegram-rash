@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from PIL import Image, ImageOps
 from pydantic import BaseModel, Field
 
-from .. import auth, checking, config, db
-from .shared import TESTS_SQL, account, card
+from .. import auth, checking, config, db, scoring, templates
+from .shared import TESTS_SQL, account, calibration, card
 
 router = APIRouter()
 MAX_UPLOAD = 6 * 1024 * 1024
@@ -70,6 +70,9 @@ class Question(BaseModel):
     acc: list[str] = Field(default_factory=list, max_length=20)
     md: Literal["key", "exact", "fuzzy"] = "key"
     opts: list[str] = Field(default_factory=list, max_length=6)
+    part: Literal["", "a", "b"] = ""
+    ball: float = 0
+    max: float = Field(default=0, ge=0, le=100)
 
 
 class NewTest(BaseModel):
@@ -82,36 +85,72 @@ class NewTest(BaseModel):
     subj: str = ""
     pay: Literal["m", "c"] = "m"
     price: int = Field(default=0, ge=0, le=10_000_000)
-    questions: list[Question] = Field(min_length=1, max_length=100)
+    tpl: str = Field(default="", max_length=10)
+    questions: list[Question] = Field(min_length=1, max_length=120)
+
+
+def layout(body: NewTest) -> list[dict]:
+    """Har bir yuborilgan qator qaysi savolga tegishli ekani. Qolipda tartib serverda tekshiriladi."""
+    if not body.tpl:
+        if len(body.questions) > 100:
+            raise HTTPException(400, "Savollar soni 100 tadan oshmasin.")
+        return [{"label": str(i), "type": "free", "sec": "", "k": body.k, "cont": False}
+                for i in range(1, len(body.questions) + 1)]
+    tpl = templates.TEMPLATES.get(body.tpl)
+    if not tpl:
+        raise HTTPException(400, "Bunday qolip yoʻq.")
+    wrong = HTTPException(400, "Savollar tanlangan qolipga mos emas.")
+    out, pos = [], 0
+    for slot in tpl["slots"]:
+        if pos >= len(body.questions):
+            raise wrong
+        parts = ["a", "b"] if slot["type"] == "o" and body.questions[pos].part == "a" else [""]
+        for part in parts:
+            if pos >= len(body.questions) or body.questions[pos].part != part:
+                raise wrong
+            out.append({"label": f"{slot['n']}{part}", "type": slot["type"], "sec": slot["sec"],
+                        "k": slot["k"], "cont": part == "b"})
+            pos += 1
+    if pos != len(body.questions):
+        raise wrong
+    return out
 
 
 def build_key(body: NewTest) -> list[dict]:
     key = []
-    for i, q in enumerate(body.questions, 1):
+    for q, meta in zip(body.questions, layout(body)):
+        name, kind, k = meta["label"], meta["type"], meta["k"]
+        written = q.w if kind == "free" else kind in ("o", "m")
+        # b band matni a band bilan birga beriladi.
         text = "" if body.printed else q.t.strip()
         img = None if body.printed else q.img
-        if not body.printed and not text and not img:
-            raise HTTPException(400, f"{i}-savolda matn yoki rasm yoʻq.")
-        accepted = []
-        options = []
-        answer = None
-        if q.w:
+        if not body.printed and not meta["cont"] and not text and not img:
+            raise HTTPException(400, f"{name}-savolda matn yoki rasm yoʻq.")
+        accepted, options, answer, ball, most = [], [], None, 0, 0
+        if kind == "m":
+            most = round(q.max, 1)
+            if most <= 0:
+                raise HTTPException(400, f"{name}-savolda maksimal ball kiritilmagan.")
+        elif written:
             accepted = [a.strip() for a in q.acc if checking.norm(a)]
             if not accepted or any(len(a) > 200 for a in accepted):
-                raise HTTPException(400, f"{i}-savolda yozma javob notoʻgʻri.")
+                raise HTTPException(400, f"{name}-savolda yozma javob notoʻgʻri.")
         else:
-            if not q.a or q.a not in config.LETTERS[:body.k]:
-                raise HTTPException(400, f"{i}-savolda javob belgilanmagan.")
+            if not q.a or q.a not in config.LETTERS[:k]:
+                raise HTTPException(400, f"{name}-savolda javob belgilanmagan.")
             answer = q.a
             if not body.printed:
-                options = [o.strip() for o in q.opts[:body.k]]
-                options += [""] * (body.k - len(options))
+                options = [o.strip() for o in q.opts[:k]]
+                options += [""] * (k - len(options))
                 if any(len(o) > 500 for o in options):
-                    raise HTTPException(400, f"{i}-savolda variant matni juda uzun.")
+                    raise HTTPException(400, f"{name}-savolda variant matni juda uzun.")
                 # Rasmli savolda variantlar rasmning ichida bo'lishi mumkin.
                 if not img and not all(options):
-                    raise HTTPException(400, f"{i}-savolda variant matni yoʻq.")
-        key.append({"t": text, "img": img, "w": q.w, "a": answer, "acc": accepted, "md": q.md, "opts": options})
+                    raise HTTPException(400, f"{name}-savolda variant matni yoʻq.")
+        if body.tpl and not most:
+            ball = q.ball if q.ball in templates.Y1_BALLS else 2.2
+        key.append({"t": text, "img": img, "w": written, "a": answer, "acc": accepted, "md": q.md, "opts": options,
+                    "label": name, "sec": meta["sec"], "k": k, "ball": ball, "max": most})
     return key
 
 
@@ -134,12 +173,12 @@ async def create_test(body: NewTest, acc=Depends(auth.teacher)):
         while not code:
             code = await conn.fetchval(
                 """INSERT INTO tests(code, owner_id, title, minutes, n, k, printed, pub, is_open,
-                                     subj, pay, price, key)
-                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+                                     subj, pay, price, key, tpl)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
                    ON CONFLICT (code) DO NOTHING RETURNING code""",
                 f"RASH-{100000 + secrets.randbelow(900000)}", me["id"], body.title.strip() or "Nomsiz test",
-                body.min, len(key), body.k, body.printed, pub, body.open,
-                body.subj if pub else "", body.pay if pub else "", body.price if pub else 0, key)
+                body.min, len(key), 6 if body.tpl else body.k, body.printed, pub, body.open,
+                body.subj if pub else "", body.pay if pub else "", body.price if pub else 0, key, body.tpl)
         if images:
             done = await conn.execute(
                 "UPDATE images SET test_code = $1 WHERE id = ANY($2) AND owner_id = $3 AND test_code IS NULL",
@@ -161,33 +200,38 @@ async def my_tests(acc=Depends(auth.teacher)):
 @router.get("/api/my/tests/{code}/attempts")
 async def test_attempts(code: str, acc=Depends(auth.teacher)):
     test = await db.pool.fetchrow(
-        "SELECT title, key FROM tests WHERE code = $1 AND owner_id = $2", code, acc["id"])
+        "SELECT title, key, tpl FROM tests WHERE code = $1 AND owner_id = $2", code, acc["id"])
     if not test:
         raise HTTPException(404, "Test topilmadi.")
     rows = await db.pool.fetch(
-        """SELECT a.id, a.answers, a.accepted, a.submitted_at, s.name FROM attempts a
+        """SELECT a.id, a.answers, a.accepted, a.scores, a.submitted_at, s.name FROM attempts a
            JOIN accounts s ON s.id = a.account_id
            WHERE a.test_code = $1 AND a.submitted_at IS NOT NULL
            ORDER BY a.submitted_at DESC LIMIT 300""", code)
+    cal = await calibration(db.pool, code)
     items = []
     for r in rows:
-        review, ok = checking.grade(test["key"], r["answers"], r["accepted"])
+        review, ok = checking.grade(test["key"], r["answers"], r["accepted"], r["scores"])
         # Yozilgan, lekin xato deb olingan yozma javoblar: o'qituvchi ko'rib chiqishi mumkin.
-        check = sum(1 for q in review if q["w"] and not q["ok"] and (q["my"] or "").strip())
-        items.append({"id": r["id"], "name": r["name"], "ok": ok, "n": len(review), "check": check,
-                      "at": r["submitted_at"].isoformat()})
+        check = sum(1 for q in review if q["w"] and not q["max"] and not q["ok"] and (q["my"] or "").strip())
+        pending = sum(1 for q in review if q["max"] and q["got"] is None)
+        items.append({"id": r["id"], "name": r["name"], "ok": ok, "n": sum(1 for q in review if not q["max"]),
+                      "check": check, "pending": pending, "at": r["submitted_at"].isoformat(),
+                      "score": scoring.summary(test["tpl"], review, cal) if cal else None})
     return {"title": test["title"], "items": items}
 
 
-ATTEMPT_SQL = """SELECT a.id, a.answers, a.accepted, s.name, t.code, t.title, t.k, t.key
+ATTEMPT_SQL = """SELECT a.id, a.answers, a.accepted, a.scores, s.name, t.code, t.title, t.k, t.key, t.tpl
 FROM attempts a JOIN tests t ON t.code = a.test_code JOIN accounts s ON s.id = a.account_id
 WHERE a.id = $1 AND t.owner_id = $2 AND a.submitted_at IS NOT NULL"""
 
 
-def attempt_view(row, accepted: list[int]) -> dict:
-    review, ok = checking.grade(row["key"], row["answers"], accepted)
+async def attempt_view(conn, row, accepted: list[int], scores: dict) -> dict:
+    review, ok = checking.grade(row["key"], row["answers"], accepted, scores)
+    cal = await calibration(conn, row["code"])
     return {"id": row["id"], "name": row["name"], "code": row["code"], "title": row["title"], "k": row["k"],
-            "ok": ok, "n": len(review), "review": review}
+            "ok": ok, "n": sum(1 for q in review if not q["max"]), "review": review,
+            "score": scoring.summary(row["tpl"], review, cal) if cal else None}
 
 
 @router.get("/api/my/attempts/{attempt_id}")
@@ -195,11 +239,11 @@ async def attempt_detail(attempt_id: int, acc=Depends(auth.teacher)):
     row = await db.pool.fetchrow(ATTEMPT_SQL, attempt_id, acc["id"])
     if not row:
         raise HTTPException(404, "Natija topilmadi.")
-    return attempt_view(row, row["accepted"])
+    return await attempt_view(db.pool, row, row["accepted"], row["scores"])
 
 
 class Mark(BaseModel):
-    index: int = Field(ge=0, le=99)
+    index: int = Field(ge=0, le=119)
     ok: bool
 
 
@@ -213,15 +257,34 @@ async def mark(attempt_id: int, body: Mark, acc=Depends(auth.teacher)):
         if body.index >= len(review):
             raise HTTPException(400, "Bunday savol yoʻq.")
         q = review[body.index]
-        if not q["w"] or q["auto"] or not (q["my"] or "").strip():
+        if not q["w"] or q["max"] or q["auto"] or not (q["my"] or "").strip():
             raise HTTPException(400, "Faqat xato deb olingan yozma javobni oʻzgartirish mumkin.")
-        accepted = set(row["accepted"]) - {body.index}
-        if body.ok:
-            accepted.add(body.index)
-        view = attempt_view(row, sorted(accepted))
-        await conn.execute("UPDATE attempts SET accepted = $1, ok = $2 WHERE id = $3",
-                           sorted(accepted), view["ok"], attempt_id)
-    return view
+        accepted = sorted(set(row["accepted"]) - {body.index} | ({body.index} if body.ok else set()))
+        _, ok = checking.grade(row["key"], row["answers"], accepted)
+        await conn.execute("UPDATE attempts SET accepted = $1, ok = $2 WHERE id = $3", accepted, ok, attempt_id)
+        return await attempt_view(conn, row, accepted, row["scores"])
+
+
+class Score(BaseModel):
+    index: int = Field(ge=0, le=119)
+    points: float = Field(ge=0, le=100)
+
+
+@router.post("/api/my/attempts/{attempt_id}/score")
+async def score(attempt_id: int, body: Score, acc=Depends(auth.teacher)):
+    """Yozma ish / esseni o'qituvchi baholaydi."""
+    async with db.pool.acquire() as conn, conn.transaction():
+        row = await conn.fetchrow(ATTEMPT_SQL + " FOR UPDATE OF a", attempt_id, acc["id"])
+        if not row:
+            raise HTTPException(404, "Natija topilmadi.")
+        most = row["key"][body.index].get("max") if body.index < len(row["key"]) else 0
+        if not most:
+            raise HTTPException(400, "Bu savolga qoʻlda ball qoʻyilmaydi.")
+        if body.points > most:
+            raise HTTPException(400, f"Ball {most:g} dan oshmasin.")
+        scores = {**row["scores"], str(body.index): round(body.points, 1)}
+        await conn.execute("UPDATE attempts SET scores = $1 WHERE id = $2", scores, attempt_id)
+        return await attempt_view(conn, row, row["accepted"], scores)
 
 
 class Open(BaseModel):

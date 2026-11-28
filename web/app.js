@@ -4,7 +4,12 @@ var ME=null,CFG=null,SUBJ=[],me=null,role=null,pend=null,S,mk=[],printed=false,o
 var cur=null,sa=[],seq=0,timerId=null,deadline=0,sending=false,pickIdx=0,toastId=null;
 var PN={t:["create","mine","acct"],s:["find","sec","bal","res"],a:["tests","earn","price","users"]};
 var fmt=function(n){return Math.round(n).toLocaleString("ru-RU")};
-function newS(){S={n:10,k:4,ans:[],w:[],acc:[],md:[],txt:[],img:[],opt:[]};mk=[]}newS();
+function newS(){S={n:10,k:4,tpl:"",meta:[],ans:[],w:[],acc:[],md:[],txt:[],img:[],opt:[],ball:[],max:[]};mk=[]}newS();
+var ARR=["meta","ans","w","acc","md","txt","img","opt","ball","max"];
+function K(i){return S.tpl?S.meta[i].k:S.k}
+function kind(i){return S.tpl?S.meta[i].type:"free"}
+function lab(i){return S.tpl?S.meta[i].n+S.meta[i].part:String(i+1)}
+function isB(i){return !!S.tpl&&S.meta[i].part==="b"}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 
 /* ----- server bilan aloqa ----- */
@@ -20,7 +25,7 @@ async function api(method,url,body){
 function fail(e){toast(e.message,false)}
 function setAcc(a){ME.accounts[a.role]=a;if(role===a.role)me=a;updHeader()}
 async function refresh(){
-  ME=await api("GET","/api/me");CFG=ME.cfg;SUBJ=ME.subjects;
+  ME=await api("GET","/api/me");CFG=ME.cfg;CFG.tpl=ME.templates;SUBJ=ME.subjects;
   if(role&&role!=="a")me=ME.accounts[role];updHeader();updTexts();
 }
 
@@ -82,20 +87,43 @@ function mode(m){
 }
 function updTur(){$("payBox").classList.toggle("hide",!($("tur").value==="p"&&!printed))}
 function updPay(){var c=$("pay").value==="c";$("nl").textContent=c?"Narx (kredit)":"Narx (soʻm)";$("narx").value=c?10:10000}
+/* ----- qoliplar ----- */
+function entry(s,part){return{meta:{n:s.n,type:s.type,sec:s.sec,k:s.k,part:part},ans:null,w:s.type==="o",acc:[],md:"key",txt:"",img:null,opt:["","","","","",""],ball:2.2,max:part?0:(s.max||0)}}
+function fillTpl(id){
+  S.img.forEach(dropImg);newS();S.tpl=id;
+  if(id)CFG.tpl[id].slots.forEach(function(s){(s.parts===2?["a","b"]:[""]).forEach(function(p){var e=entry(s,p);ARR.forEach(function(a){S[a].push(e[a])})})});
+  $("vaqt").value=id?CFG.tpl[id].min:30;$("soni").value=10;$("tpl").value=id;
+  Array.prototype.forEach.call(document.querySelectorAll(".freeOnly"),function(el){el.classList.toggle("hide",!!id)});
+  hideToast();render();
+}
+function setTpl(id){
+  var old=S.tpl,filled=S.ans.some(function(a){return a!==null})||S.txt.some(Boolean)||S.img.some(Boolean)||S.acc.some(function(a){return a.length});
+  if(!filled)return fillTpl(id);
+  var q="Qolip almashtirilsa, kiritilgan savollar oʻchadi. Davom etilsinmi?",done=function(ok){if(ok)fillTpl(id);else $("tpl").value=old};
+  if(tg&&tg.showConfirm&&tg.isVersionAtLeast&&tg.isVersionAtLeast("6.2"))tg.showConfirm(q,done);else done(window.confirm(q));
+}
+/* Ochiq savolga b band qoʻshish yoki olib tashlash. */
+function toggleB(i){
+  var m=S.meta[i];
+  if(m.part==="a"){dropImg(S.img[i+1]);ARR.forEach(function(a){S[a].splice(i+1,1)});S.meta[i].part=""}
+  else{m.part="a";var e=entry({n:m.n,type:m.type,sec:m.sec,k:m.k},"b");ARR.forEach(function(a){S[a].splice(i+1,0,e[a])})}
+  mk=[];hideToast();render();
+}
 /* Massivlar qisqartirilmaydi: son maydonida yozayotganda kiritilganlar oʻchib ketmasin. */
 function sync(){
+  if(S.tpl){S.n=S.meta.length;return}
   var n=Math.max(1,Math.min(100,parseInt($("soni").value)||1));S.n=n;S.k=parseInt($("var").value);
-  while(S.ans.length<n){S.ans.push(null);S.w.push(false);S.acc.push([]);S.md.push("key");S.txt.push("");S.img.push(null);S.opt.push(["","","","","",""])}
+  while(S.ans.length<n){S.meta.push(null);S.ans.push(null);S.w.push(false);S.acc.push([]);S.md.push("key");S.txt.push("");S.img.push(null);S.opt.push(["","","","","",""]);S.ball.push(2.2);S.max.push(0)}
   S.ans=S.ans.map(function(a){return a!==null&&L.indexOf(a)>=S.k?null:a});
 }
-function ansOk(i){return S.w[i]?S.acc[i].length>0:S.ans[i]!==null}
-function optsOk(i){for(var j=0;j<S.k;j++)if(!S.opt[i][j].trim())return false;return true}
+function ansOk(i){if(kind(i)==="m")return S.max[i]>0&&S.max[i]<=100;return S.w[i]?S.acc[i].length>0:S.ans[i]!==null}
+function optsOk(i){for(var j=0;j<K(i);j++)if(!S.opt[i][j].trim())return false;return true}
 /* Rasmli savolda variantlar rasm ichida boʻlishi mumkin, shuning uchun ularning matni shart emas. */
-function rowOk(i){return ansOk(i)&&(printed||(!!S.img[i]||S.txt[i].trim()!=="")&&(S.w[i]||!!S.img[i]||optsOk(i)))}
-function bubble(i,j){return '<button type="button" class="b'+(S.ans[i]===L[j]?' on':'')+'" aria-label="'+(i+1)+'-savol '+L[j]+' toʻgʻri javob" onclick="pick('+i+','+j+')">'+L[j]+'</button>'}
+function rowOk(i){return ansOk(i)&&(printed||isB(i)||(!!S.img[i]||S.txt[i].trim()!=="")&&(S.w[i]||kind(i)==="m"||!!S.img[i]||optsOk(i)))}
+function bubble(i,j){return '<button type="button" class="b'+(S.ans[i]===L[j]?' on':'')+'" aria-label="'+lab(i)+'-savol '+L[j]+' toʻgʻri javob" onclick="pick('+i+','+j+')">'+L[j]+'</button>'}
 function optRows(i){
   var h='<div class="opts">';
-  for(var j=0;j<S.k;j++)h+='<div class="opt">'+bubble(i,j)+'<textarea rows="1" maxlength="500" placeholder="'+L[j]+' variant matni" aria-label="'+(i+1)+'-savol '+L[j]+' variant matni" oninput="S.opt['+i+']['+j+']=this.value;grow(this);chk('+i+')">'+esc(S.opt[i][j])+'</textarea></div>';
+  for(var j=0;j<K(i);j++)h+='<div class="opt">'+bubble(i,j)+'<textarea rows="1" maxlength="500" placeholder="'+L[j]+' variant matni" aria-label="'+lab(i)+'-savol '+L[j]+' variant matni" oninput="S.opt['+i+']['+j+']=this.value;grow(this);chk('+i+')">'+esc(S.opt[i][j])+'</textarea></div>';
   return h+'</div>';
 }
 function grow(el){el.style.height="auto";el.style.height=(el.scrollHeight+2)+"px"}
@@ -104,7 +132,7 @@ function imgBox(i){
   var m=S.img[i];
   if(!m)return '<button type="button" class="addimg" onclick="pickImg('+i+')">'+ICON+'Rasm qoʻshish</button>';
   if(m.busy)return '<div class="pic busy"><img src="'+m.url+'" alt=""><small>Rasm yuklanmoqda…</small></div>';
-  return '<div class="pic"><img src="'+m.url+'" alt="'+(i+1)+'-savol rasmi" onclick="zoom(this.src)"><button type="button" class="lnk" onclick="pickImg('+i+')">Almashtirish</button><button type="button" class="lnk" onclick="delImg('+i+')">Olib tashlash</button></div>';
+  return '<div class="pic"><img src="'+m.url+'" alt="'+lab(i)+'-savol rasmi" onclick="zoom(this.src)"><button type="button" class="lnk" onclick="pickImg('+i+')">Almashtirish</button><button type="button" class="lnk" onclick="delImg('+i+')">Olib tashlash</button></div>';
 }
 function drawImg(i){var el=$("im"+i);if(el)el.innerHTML=imgBox(i);chk(i)}
 function pickImg(i){pickIdx=i;$("file").value="";$("file").click()}
@@ -131,31 +159,40 @@ async function onFile(){
   try{
     var blob=await shrink(file),d=await api("POST","/api/images",blob);
     m.id=d.id;m.busy=false;m.url="/img/"+d.id;
-    if(draft!==S||S.img[i]!==m){dropImg(m);return}
+    i=S.img.indexOf(m); /* b band qoʻshilsa tartib siljishi mumkin */
+    if(draft!==S||i<0){dropImg(m);return}
     dropImg(old);drawImg(i);
   }catch(e){
-    if(draft===S&&S.img[i]===m){S.img[i]=old;drawImg(i)}
+    i=S.img.indexOf(m);if(draft===S&&i>=0){S.img[i]=old;drawImg(i)}
     fail(e);
   }
 }
+function ballSel(i){
+  return '<label class="mini">Savol bali <select onchange="S.ball['+i+']=+this.value">'+[[1.3,"1,3 · oson"],[2.2,"2,2 · oʻrta"],[3.2,"3,2 · qiyin"]].map(function(o){return '<option value="'+o[0]+'"'+(S.ball[i]===o[0]?' selected':'')+'>'+o[1]+'</option>'}).join("")+'</select></label>';
+}
 function render(fi){
-  sync();var h="",i,j;
+  sync();var h="",i,j,sec="";
   for(i=0;i<S.n;i++){
+    var t=kind(i),b=isB(i);
+    if(S.tpl&&S.meta[i].sec!==sec){sec=S.meta[i].sec;h+='<div class="sec">'+esc(sec)+'</div>'}
     h+='<div class="row'+(mk.indexOf(i)>-1&&!rowOk(i)?' miss':'')+'" id="r'+i+'">';
-    if(!printed)h+='<div class="q"><textarea maxlength="2000" placeholder="'+(i+1)+'-savol matni" oninput="S.txt['+i+']=this.value;chk('+i+')">'+esc(S.txt[i])+'</textarea><div id="im'+i+'">'+imgBox(i)+'</div></div>';
-    h+='<div class="rl"><span class="num">'+(i+1)+'</span><div class="bub">';
-    if(S.w[i])h+='<span class="hint">Yozma javob</span>';
-    else if(printed)for(j=0;j<S.k;j++)h+=bubble(i,j);
+    if(!printed&&!b)h+='<div class="q"><textarea maxlength="2000" placeholder="'+(S.tpl?S.meta[i].n:i+1)+'-savol matni" oninput="S.txt['+i+']=this.value;chk('+i+')">'+esc(S.txt[i])+'</textarea><div id="im'+i+'">'+imgBox(i)+'</div></div>';
+    h+='<div class="rl"><span class="num">'+lab(i)+'</span><div class="bub">';
+    if(t==="m")h+='<span class="hint">Yozma ish · oʻqituvchi baholaydi</span>';
+    else if(S.w[i])h+='<span class="hint">Yozma javob</span>';
+    else if(printed)for(j=0;j<K(i);j++)h+=bubble(i,j);
     else h+='<span class="hint">Toʻgʻri variant harfini bosing</span>';
-    h+='</div><button class="wr'+(S.w[i]?' on':'')+'" onclick="tw('+i+')">Yozma</button></div>';
-    if(!S.w[i]&&!printed)h+=optRows(i);
-    if(S.w[i]){
+    h+='</div>'+(t==="free"?'<button class="wr'+(S.w[i]?' on':'')+'" onclick="tw('+i+')">Yozma</button>':'')+'</div>';
+    if(t!=="m"&&!S.w[i]&&!printed)h+=optRows(i);
+    if(t==="m")h+='<div class="wbox"><small>Maksimal ball</small><input type="number" min="1" max="100" inputmode="decimal" placeholder="Masalan, 25" value="'+(S.max[i]||"")+'" oninput="S.max['+i+']=+this.value;chk('+i+')"></div>';
+    else if(S.w[i]){
       h+='<div class="wbox"><div class="chips" id="ch'+i+'">'+chips(i)+'</div>';
       h+='<input id="in'+i+'" maxlength="200" placeholder="Javob yozing va Enter bosing" onkeydown="if(event.key===\'Enter\'||event.key===\',\'){event.preventDefault();add('+i+')}" onblur="add('+i+',1)">';
       h+='<small>Bir nechta variant qoʻshing: Alisher Navoiy, Navoiy.</small><select onchange="S.md['+i+']=this.value">';
       [["key","Kalit soʻz"],["exact","Aniq"],["fuzzy","Imloga bardoshli"]].forEach(function(o){h+='<option value="'+o[0]+'"'+(S.md[i]===o[0]?' selected':'')+'>'+o[1]+'</option>'});
       h+='</select></div>';
     }
+    if(S.tpl&&t!=="m")h+='<div class="wbox">'+ballSel(i)+(t==="o"&&!b?'<button class="lnk" onclick="toggleB('+i+')">'+(S.meta[i].part?'b bandni olib tashlash':'+ b band qoʻshish')+'</button>':'')+'</div>';
     h+='</div>';
   }
   $("rows").innerHTML=h;prog();Array.prototype.forEach.call(document.querySelectorAll("#rows .opt textarea"),function(el){if(el.value)grow(el)});if(fi!==undefined&&$("in"+fi))$("in"+fi).focus();
@@ -173,7 +210,7 @@ function rm(i,k){S.acc[i].splice(k,1);drawChips(i)}
 function prog(){var d=0;for(var i=0;i<S.n;i++)if(rowOk(i))d++;var p=Math.round(d/S.n*100);
   $("pt").textContent=d+" / "+S.n+" toʻldirildi";$("pp").textContent=p+"%";$("pf").style.width=p+"%"}
 function fix(){if(!mk.length)return;mk=mk.filter(function(i){return i<S.n&&!rowOk(i)});if(mk.length)showMiss();else hideToast()}
-function showMiss(){var m=mk.map(function(i){return i+1});
+function showMiss(){var m=mk.map(lab);
   toast(m.length+" ta savolda "+(printed?"javob belgilanmagan":"javob, matn yoki variant yetishmaydi")+": "+m.slice(0,6).join(", ")+(m.length>6?" …":""),true)}
 function jump(){if(mk.length)$("r"+mk[0]).scrollIntoView({behavior:"smooth",block:"center"})}
 async function upload(){
@@ -182,12 +219,12 @@ async function upload(){
   if(!printed)for(i=0;i<S.n;i++)if(S.img[i]&&S.img[i].busy){toast("Rasm hali yuklanyapti, biroz kuting.",false);return}
   if(me.cr<CFG.tc){toast("Kredit yetarli emas. Hisob boʻlimida kredit paketini sotib oling.",false);return}
   var pub=$("tur").value==="p"&&!printed,subj=$("subj").value;
-  for(i=0;i<S.n;i++)q.push({t:printed?"":S.txt[i].trim(),img:!printed&&S.img[i]?S.img[i].id:null,w:S.w[i],a:S.w[i]?null:S.ans[i],acc:S.w[i]?S.acc[i]:[],md:S.md[i],opts:!printed&&!S.w[i]?S.opt[i].slice(0,S.k):[]});
+  for(i=0;i<S.n;i++)q.push({t:printed||isB(i)?"":S.txt[i].trim(),img:!printed&&!isB(i)&&S.img[i]?S.img[i].id:null,w:S.w[i],a:S.w[i]?null:S.ans[i],acc:S.w[i]?S.acc[i]:[],md:S.md[i],opts:!printed&&!S.w[i]&&kind(i)!=="m"?S.opt[i].slice(0,K(i)):[],part:S.tpl?S.meta[i].part:"",ball:S.tpl?S.ball[i]:0,max:kind(i)==="m"?S.max[i]:0});
   $("ub").disabled=true;
   try{
-    var d=await api("POST","/api/tests",{title:$("nom").value,min:Math.max(1,Math.min(600,parseInt($("vaqt").value)||30)),k:S.k,printed:printed,pub:pub,
+    var d=await api("POST","/api/tests",{title:$("nom").value,min:Math.max(1,Math.min(600,parseInt($("vaqt").value)||30)),k:S.k,tpl:S.tpl,printed:printed,pub:pub,
       open:$("kir").value==="Ochiq",subj:pub?subj:"",pay:$("pay").value,price:pub?Math.max(0,parseInt($("narx").value)||0):0,questions:q});
-    setAcc(d.account);fin=true;newS();
+    setAcc(d.account);fin=true;newS();$("tpl").value="";
     $("kod").textContent=d.code;$("dl").textContent=d.cost+" kredit yechildi, qoldi: "+d.account.cr+". "+(pub?"Test "+subj+" boʻlimiga qoʻshildi.":"Oʻquvchilarga shu kodni bering.");
     $("form").classList.add("hide");$("done").classList.remove("hide");barS();hideToast();window.scrollTo(0,0);
   }catch(e){fail(e)}
@@ -195,7 +232,7 @@ async function upload(){
 }
 function copyText(t){try{navigator.clipboard.writeText(t)}catch(e){}}
 function copyCode(){copyText($("kod").textContent);$("cp").textContent="Nusxalandi";setTimeout(function(){$("cp").textContent="Kodni nusxalash"},1500)}
-function again(){newS();fin=false;$("nom").value="";$("soni").value=10;$("done").classList.add("hide");$("form").classList.remove("hide");mode(printed?1:0);barS()}
+function again(){S.img=[];fillTpl("");fin=false;$("nom").value="";$("done").classList.add("hide");$("form").classList.remove("hide");mode(printed?1:0);barS()}
 async function toStudent(){
   var c=$("kod").textContent;
   try{
@@ -218,27 +255,28 @@ function reqList(a){
   if(!a.length)return '<p class="lead">Ariza yoʻq.</p>';
   return a.map(function(r){return '<div class="card"><b>'+reqName(r)+'</b><small>'+{new:"Kutilmoqda · 1 soat ichida javob olasiz",done:"Tasdiqlandi",rejected:"Rad etildi"}[r.status]+'</small></div>'}).join("");
 }
+function short(s){return s&&s.final!==null?'<small class="okt">'+num(s.final)+' / 75'+(s.level?' · '+s.level:'')+'</small>':''}
 function st(t){return t.votes?"★ "+t.rating.toFixed(1)+" ("+t.votes+")":"Baholanmagan"}
 function ptx(t){return t.pay==="c"?t.price+" kredit":fmt(t.price)+" soʻm"}
-function cardL(a){return a.map(function(t){return '<div class="card click" data-c="'+t.code+'" onclick="go(this.dataset.c)"><b>'+esc(t.title)+'</b><small>'+esc(t.subj)+' · '+t.n+' savol · '+t.code+'</small><small>'+st(t)+' · '+(t.price?ptx(t):"Tekin")+'</small></div>'}).join("")}
+function cardL(a){return a.map(function(t){return '<div class="card click" data-c="'+t.code+'" onclick="go(this.dataset.c)"><b>'+esc(t.title)+'</b><small>'+esc(t.subj)+' · '+t.qn+' savol · '+t.code+'</small><small>'+st(t)+' · '+(t.price?ptx(t):"Tekin")+'</small></div>'}).join("")}
 function go(c){pane("s","find");$("kodin").value=c;showT(c)}
 
 /* ----- Oqituvchi: testlar, hisob ----- */
 async function mineV(){
   var a=await api("GET","/api/my/tests"),h='<h1>Testlarim</h1>';
   if(!a.length)h+='<p class="lead">Hali test yaratilmagan.</p>';
-  a.forEach(function(t){h+='<div class="card"><b>'+esc(t.title)+'</b><small>'+t.code+' · '+(t.printed?'Bosma':'Oddiy')+' · '+t.n+' savol · '+(t.open?'Ochiq':'Yopiq')+'</small><small>'+(t.pub?esc(t.subj)+' · '+(t.price?ptx(t):'Tekin')+' · sotilgan: '+t.sold+' · '+st(t):'Oʻz oʻquvchilari uchun')+'</small>'
+  a.forEach(function(t){h+='<div class="card"><b>'+esc(t.title)+'</b><small>'+t.code+' · '+(t.printed?'Bosma':'Oddiy')+(t.tpl?' · '+esc(t.tpl_name):'')+' · '+t.qn+' savol · '+(t.open?'Ochiq':'Yopiq')+'</small><small>'+(t.pub?esc(t.subj)+' · '+(t.price?ptx(t):'Tekin')+' · sotilgan: '+t.sold+' · '+st(t):'Oʻz oʻquvchilari uchun')+'</small>'
     +'<button class="lnk" data-c="'+t.code+'" onclick="resT(this.dataset.c).catch(fail)">Natijalar ('+t.attempts+')</button><button class="lnk" data-c="'+t.code+'" onclick="copyText(this.dataset.c);this.textContent=\'Nusxalandi\'">Kodni nusxalash</button><button class="lnk" data-c="'+t.code+'" onclick="setOpen(this.dataset.c,'+!t.open+')">'+(t.open?'Yopish':'Ochish')+'</button></div>'});
   $("p_t_mine").innerHTML=h;
 }
 async function resT(c){
   var d=await api("GET","/api/my/tests/"+c+"/attempts");
   var h='<button class="lnk" onclick="mineV().catch(fail)">← Testlarim</button><h1>'+esc(d.title)+'</h1><p class="lead">'+(d.items.length?'Javoblarni koʻrish uchun oʻquvchini tanlang.':'Hali hech kim yechmagan.')+'</p>';
-  d.items.forEach(function(a){h+='<div class="card click" onclick="attV('+a.id+').catch(fail)"><b>'+esc(a.name)+'</b><small>'+a.ok+' / '+a.n+' · '+Math.round(a.ok/a.n*100)+'% · '+new Date(a.at).toLocaleString("ru-RU",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})+'</small>'+(a.check?'<small class="tbad">Tekshirib koʻring: '+a.check+' ta yozma javob xato deb olingan</small>':'')+'</div>'});
+  d.items.forEach(function(a){h+='<div class="card click" onclick="attV('+a.id+').catch(fail)"><b>'+esc(a.name)+'</b><small>'+a.ok+' / '+a.n+' · '+Math.round(a.ok/a.n*100)+'% · '+new Date(a.at).toLocaleString("ru-RU",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})+'</small>'+short(a.score)+(a.pending?'<small class="tbad">Baholang: '+a.pending+' ta yozma ish</small>':'')+(a.check?'<small class="tbad">Tekshirib koʻring: '+a.check+' ta yozma javob xato deb olingan</small>':'')+'</div>'});
   $("p_t_mine").innerHTML=h;window.scrollTo(0,0);
 }
 function attHtml(d){
-  return '<button class="lnk" data-c="'+d.code+'" onclick="resT(this.dataset.c).catch(fail)">← Natijalar</button><h1>'+esc(d.name)+'</h1><p class="lead">'+esc(d.title)+' · '+d.ok+' / '+d.n+' toʻgʻri</p><div class="panel">'+reviewRows(d.review,d.k,d.id)+'</div>';
+  return '<button class="lnk" data-c="'+d.code+'" onclick="resT(this.dataset.c).catch(fail)">← Natijalar</button><h1>'+esc(d.name)+'</h1><p class="lead">'+esc(d.title)+' · '+d.ok+' / '+d.n+' toʻgʻri</p>'+scoreBox(d.score)+'<div class="panel">'+reviewRows(d.review,d.k,d.id)+'</div>';
 }
 async function attV(id){
   var d=await api("GET","/api/my/attempts/"+id);$("p_t_mine").innerHTML=attHtml(d);window.scrollTo(0,0);
@@ -246,6 +284,12 @@ async function attV(id){
 async function mark(id,i,ok,btn){
   btn.disabled=true;
   try{var d=await api("POST","/api/my/attempts/"+id+"/mark",{index:i,ok:ok});var y=window.scrollY;$("p_t_mine").innerHTML=attHtml(d);window.scrollTo(0,y)}
+  catch(e){btn.disabled=false;fail(e)}
+}
+async function give_score(id,i,btn){
+  var v=parseFloat($("sc"+i).value);if(isNaN(v)||v<0){toast("Ballni kiriting.",false);return}
+  btn.disabled=true;
+  try{var d=await api("POST","/api/my/attempts/"+id+"/score",{index:i,points:v});var y=window.scrollY;$("p_t_mine").innerHTML=attHtml(d);window.scrollTo(0,y);toast("Saqlandi.",false,true)}
   catch(e){btn.disabled=false;fail(e)}
 }
 async function setOpen(c,v){try{await api("POST","/api/my/tests/"+c+"/open",{open:v});await mineV()}catch(e){fail(e)}}
@@ -277,7 +321,7 @@ async function showT(c){
 }
 function buyCard(){
   var need=cur.need_buy;
-  $("buy").innerHTML='<b>'+esc(cur.title)+'</b><small>'+(cur.subj?esc(cur.subj)+' · ':'')+cur.n+' savol · '+cur.min+' daqiqa · '+st(cur)+'</small>'+(need?'<small>Narxi: '+ptx(cur)+'</small>':'')
+  $("buy").innerHTML='<b>'+esc(cur.title)+'</b><small>'+(cur.subj?esc(cur.subj)+' · ':'')+cur.qn+' savol · '+cur.min+' daqiqa · '+st(cur)+'</small>'+(need?'<small>Narxi: '+ptx(cur)+'</small>':'')
     +'<div style="height:10px"></div><button class="cta" id="bb" onclick="'+(need?'buy()':'startT()')+'">'+(need?(cur.pay==="c"?"Kredit bilan olish":"Balansdan sotib olish"):"Testni boshlash")+'</button>';
   $("buy").classList.remove("hide");
 }
@@ -291,16 +335,21 @@ async function startT(){
   try{var d=await api("POST","/api/tests/"+cur.code+"/start");if(my!==seq)return;cur=d;openT()}
   catch(e){if(my===seq){err(e.message);$("bb").disabled=false}}
 }
-function qHead(q,i){return (q.t?'<div class="qt">'+esc(q.t)+'</div>':'')+(q.img?'<img class="qimg" src="/img/'+q.img+'" alt="'+(i+1)+'-savol rasmi" onclick="zoom(this.src)">':'')}
+function qHead(q,i){return (q.t?'<div class="qt">'+esc(q.t)+'</div>':'')+(q.img?'<img class="qimg" src="/img/'+q.img+'" alt="'+(q.label||i+1)+'-savol rasmi" onclick="zoom(this.src)">':'')}
 function hasOpts(q){return !!q.opts&&q.opts.some(function(o){return o})}
 function openT(){
   sa=cur.questions.map(function(){return null});
-  $("sTitle").textContent=cur.title+" · "+cur.n+" ta savol, "+cur.min+" daqiqa";var h="";
+  $("sTitle").textContent=cur.title+" · "+cur.qn+" ta savol, "+cur.min+" daqiqa";var h="";
+  var sec="";
   cur.questions.forEach(function(q,i){
-    h+='<div class="row">'+qHead(q,i)+'<div class="rl'+(!q.w&&hasOpts(q)?' top':'')+'"><span class="num">'+(i+1)+'</span>';
-    if(!q.w&&hasOpts(q)){h+='<div class="opts flat">';for(var o=0;o<cur.k;o++)h+='<button class="optb" id="s'+i+'_'+o+'" aria-pressed="false" onclick="sp('+i+','+o+')"><span class="b">'+L[o]+'</span><span>'+esc(q.opts[o])+'</span></button>';h+='</div>'}
+    if(q.sec&&q.sec!==sec){sec=q.sec;h+='<div class="sec">'+esc(sec)+'</div>'}
+    var choice=!q.w&&!q.max;
+    h+='<div class="row">'+qHead(q,i)+'<div class="rl'+(choice&&hasOpts(q)?' top':'')+'"><span class="num">'+q.label+'</span>';
+    if(q.max&&q.sec==="Speaking")h+='<span class="hint">Ogʻzaki topshiriq · oʻqituvchi baholaydi</span>';
+    else if(q.max)h+='<textarea class="essay" maxlength="15000" placeholder="Javobingizni toʻliq yozing" oninput="sa['+i+']=this.value"></textarea>';
+    else if(choice&&hasOpts(q)){h+='<div class="opts flat">';for(var o=0;o<q.k;o++)h+='<button class="optb" id="s'+i+'_'+o+'" aria-pressed="false" onclick="sp('+i+','+o+')"><span class="b">'+L[o]+'</span><span>'+esc(q.opts[o])+'</span></button>';h+='</div>'}
     else if(q.w)h+='<input maxlength="500" placeholder="Javobingizni yozing" oninput="sa['+i+']=this.value">';
-    else{h+='<div class="bub">';for(var j=0;j<cur.k;j++)h+='<button class="b" id="s'+i+'_'+j+'" aria-label="'+(i+1)+'-savol '+L[j]+'" onclick="sp('+i+','+j+')">'+L[j]+'</button>';h+='</div>'}
+    else{h+='<div class="bub">';for(var j=0;j<q.k;j++)h+='<button class="b" id="s'+i+'_'+j+'" aria-label="'+q.label+'-savol '+L[j]+'" onclick="sp('+i+','+j+')">'+L[j]+'</button>';h+='</div>'}
     h+='</div></div>';
   });
   $("sRows").innerHTML=h;$("buy").classList.add("hide");$("sRes").classList.add("hide");$("sTest").classList.remove("hide");
@@ -311,7 +360,7 @@ function tick(){
   $("timer").textContent="Qolgan vaqt: "+Math.floor(s/60)+":"+("0"+s%60).slice(-2);
   if(!s){stopTimer();submitS()}
 }
-function sp(i,j){sa[i]=L[j];for(var x=0;x<cur.k;x++){var el=$("s"+i+"_"+x);el.classList.toggle("on",x===j);el.setAttribute("aria-pressed",x===j)}}
+function sp(i,j){sa[i]=L[j];for(var x=0;x<cur.questions[i].k;x++){var el=$("s"+i+"_"+x);el.classList.toggle("on",x===j);el.setAttribute("aria-pressed",x===j)}}
 async function submitS(){
   if(sending)return;sending=true;$("sb").disabled=true;var my=seq;
   try{var d=await api("POST","/api/attempts/"+cur.attempt+"/submit",{answers:sa});if(my===seq){stopTimer();showRes(d)}}
@@ -323,11 +372,31 @@ async function submitS(){
   sending=false;$("sb").disabled=false;
 }
 /* Natija qatorlari: oʻquvchi ham, oʻqituvchi ham koʻradi. attempt berilsa tuzatish tugmalari chiqadi. */
+function num(x){return String(x).replace(".",",")}
+function scoreBox(s){
+  if(!s)return "";
+  var line=function(a,b){return '<div class="sl"><span>'+a+'</span><b>'+b+'</b></div>'},wait=s.people<s.need;
+  var h='<div class="card">';
+  if(s.final!==null)h+='<div class="big">'+num(s.final)+' <small class="inl">/ 75</small></div><b>'+(s.level?'Daraja: '+s.level:'Sertifikat darajasiga yetmadi')+'</b>';
+  h+=line("Xom ball",num(s.raw)+" / "+num(s.raw_max));
+  s.parts.forEach(function(p){h+=line(esc(p.name),p.score===null?"—":num(p.score)+" / 75")});
+  if(s.written)h+=line("Yozma qism",s.written.pending?"tekshirilmoqda ("+s.written.pending+")":num(s.written.got)+" / "+num(s.written.max));
+  if(s.otm)h+=line("OTM imtiyozi (1-fan / 2-fan)",num(s.otm[0])+" / "+num(s.otm[1]));
+  if(wait)h+='<small>Rash balli kamida '+s.need+' ta oʻquvchi yechgach hisoblanadi (hozir '+s.people+').</small>';
+  else h+='<small>Taxminiy ball: shu testni yechganlar natijasi asosida. Rasmiy natija farq qilishi mumkin.</small>';
+  return h+'</div>';
+}
 function reviewRows(list,k,attempt){
+  var sec="";
   return list.map(function(q,i){
-    var r=q.ok,j,full=!q.w&&hasOpts(q),mark=function(j){return L[j]===q.a?'ok':L[j]===q.my?'bad':''};
-    var h='<div class="row">'+qHead(q,i)+'<div class="rl'+(full?' top':'')+'"><span class="num" style="color:var(--'+(r?'green':'red')+')">'+(i+1)+'</span>';
-    if(q.w){
+    var r=q.ok,j,full=!q.w&&!q.max&&hasOpts(q),mark=function(j){return L[j]===q.a?'ok':L[j]===q.my?'bad':''};k=q.k||k;
+    var head="";if(q.sec&&q.sec!==sec){sec=q.sec;head='<div class="sec">'+esc(sec)+'</div>'}
+    var h=head+'<div class="row">'+qHead(q,i)+'<div class="rl'+(full?' top':'')+'"><span class="num" style="color:var(--'+(q.max?'blue':r?'green':'red')+')">'+q.label+'</span>';
+    if(q.max){
+      h+='<div style="flex:1;min-width:0"><div class="ans">'+esc(q.my||(q.sec==="Speaking"?"Ogʻzaki topshiriq":"Javob yozilmagan"))+'</div><div class="hint">'+(q.got===null?'Tekshirilmoqda · maks. '+num(q.max):'Ball: '+num(q.got)+' / '+num(q.max))+'</div>';
+      if(attempt)h+='<input id="sc'+i+'" type="number" min="0" max="'+q.max+'" step="0.1" inputmode="decimal" placeholder="0 – '+q.max+'" value="'+(q.got===null?"":q.got)+'"><button class="cta alt mark" onclick="give_score('+attempt+','+i+',this)">Ball qoʻyish</button>';
+      h+='</div>';
+    }else if(q.w){
       h+='<div style="flex:1"><div class="'+(r?'okt':'tbad')+'">'+esc(q.my||"Javob yozilmagan")+'</div>'+(q.auto?'':'<div class="okt">Toʻgʻri javob: '+esc(q.acc.join(", "))+'</div>')+(q.manual?'<small class="hint">Oʻqituvchi toʻgʻri deb hisobladi</small>':'');
       if(attempt&&!q.auto&&q.my&&q.my.trim())h+='<button class="cta alt mark" onclick="mark('+attempt+','+i+','+!q.manual+',this)">'+(q.manual?'Bekor qilish (xato)':'Toʻgʻri deb hisoblash')+'</button>';
       h+='</div>';
@@ -343,8 +412,8 @@ function reviewRows(list,k,attempt){
   }).join("");
 }
 function showRes(d){
-  var h=reviewRows(d.review,d.k);
-  $("sScore").textContent=d.ok+" / "+d.n;$("sPct").textContent=Math.round(d.ok/d.n*100)+"% toʻgʻri";$("sRv").innerHTML=h;
+  var h=reviewRows(d.review,d.k);$("sBall").innerHTML=scoreBox(d.score);
+  $("sScore").textContent=d.ok+" / "+d.n;$("sPct").textContent=(d.n?Math.round(d.ok/d.n*100):0)+"% toʻgʻri";$("sRv").innerHTML=h;
   $("rateBox").classList.toggle("hide",!d.can_rate);stars(d.my_rating);
   $("rtxt").textContent=d.my_rating?"Bahoyingiz: "+d.my_rating+" / 5":"Yulduzchani bosing, 5 tadan eng yuqorisi.";
   $("sTest").classList.add("hide");$("sRes").classList.remove("hide");window.scrollTo(0,0);
@@ -377,7 +446,7 @@ async function balV(){
 }
 async function resV(){
   var a=await api("GET","/api/results"),h='<h1>Natijalar</h1>';if(!a.length)h+='<p class="lead">Hali test yechilmagan.</p>';
-  a.forEach(function(r){h+='<div class="card"><b>'+esc(r.title)+'</b><small>'+r.code+'</small><small>'+r.ok+' / '+r.n+' · '+Math.round(r.ok/r.n*100)+'%</small></div>'});
+  a.forEach(function(r){h+='<div class="card"><b>'+esc(r.title)+'</b><small>'+r.code+'</small><small>'+r.ok+' / '+r.n+' · '+(r.n?Math.round(r.ok/r.n*100):0)+'%</small>'+short(r.score)+'</div>'});
   $("p_s_res").innerHTML=h;
 }
 
@@ -387,8 +456,8 @@ async function aTests(){
   if(!a.length)h+='<p class="lead">Hali test yoʻq.</p>';
   a.forEach(function(t){
     h+='<div class="card"><b>'+esc(t.title)+'</b><small>'+t.code+' · '+esc(t.owner)+' · '+(t.pub?esc(t.subj)+' · '+ptx(t)+' · sotilgan '+t.sold+' · '+st(t):(t.printed?'Bosma, oʻz oʻquvchilari':'Oddiy, oʻz oʻquvchilari'))+'</small><small class="okt">Javoblar: '
-     +t.key.map(function(q,i){return(i+1)+"-"+(q.w?"["+esc(q.acc.join("/"))+"]":q.a)}).join("  ")+'</small>'
-     +t.key.map(function(q,i){return q.img?'<button class="lnk" data-s="/img/'+q.img+'" onclick="zoom(this.dataset.s)">'+(i+1)+'-rasm</button>':''}).join("")+'</div>'});
+     +t.key.map(function(q,i){return(q.label||i+1)+"-"+(q.max?"[yozma ish]":q.w?"["+esc(q.acc.join("/"))+"]":q.a)}).join("  ")+'</small>'
+     +t.key.map(function(q,i){return q.img?'<button class="lnk" data-s="/img/'+q.img+'" onclick="zoom(this.dataset.s)">'+(q.label||i+1)+'-rasm</button>':''}).join("")+'</div>'});
   $("p_a_tests").innerHTML=h;
 }
 async function aEarn(){
@@ -415,7 +484,7 @@ function aPrice(){
   $("p_a_price").innerHTML=h;
 }
 async function saveCfg(){
-  try{CFG=ME.cfg=await api("PUT","/api/admin/settings",CFG);aPrice();updTexts();toast("Saqlandi.",false,true)}catch(e){fail(e)}
+  try{var t=CFG.tpl;CFG=ME.cfg=await api("PUT","/api/admin/settings",CFG);CFG.tpl=t;aPrice();updTexts();toast("Saqlandi.",false,true)}catch(e){fail(e)}
 }
 function uCard(u){return (u.role==="t"?"Oʻqituvchi":"Oʻquvchi")+' · ID '+u.tg_id}
 async function aUsers(){
@@ -457,6 +526,7 @@ mode(0);
   try{
     await refresh();
     SUBJ.forEach(function(x){var o=document.createElement("option");o.textContent=x;$("subj").appendChild(o)});
+    Object.keys(CFG.tpl).forEach(function(id){var o=document.createElement("option");o.value=id;o.textContent=CFG.tpl[id].name+" — "+CFG.tpl[id].slots.length+" savol";$("tpl").appendChild(o)});
     $("fn").value=ME.first_name;$("ln").value=ME.last_name;
     $("boot").classList.add("hide");$("rc").classList.remove("hide");$("adm").classList.toggle("hide",!ME.is_admin);
   }catch(e){$("boot").textContent=e.message}

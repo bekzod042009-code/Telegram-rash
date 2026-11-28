@@ -66,6 +66,9 @@ CREATE TABLE IF NOT EXISTS attempts(
 CREATE INDEX IF NOT EXISTS attempts_account ON attempts(account_id, test_code);
 -- O'qituvchi to'g'ri deb qabul qilgan yozma javoblar (savol tartib raqamlari).
 ALTER TABLE attempts ADD COLUMN IF NOT EXISTS accepted JSONB NOT NULL DEFAULT '[]';
+-- Milliy sertifikat qolipi va yozma ishlarga qo'yilgan ballar.
+ALTER TABLE tests ADD COLUMN IF NOT EXISTS tpl TEXT NOT NULL DEFAULT '';
+ALTER TABLE attempts ADD COLUMN IF NOT EXISTS scores JSONB NOT NULL DEFAULT '{}';
 CREATE TABLE IF NOT EXISTS ratings(
   account_id INT NOT NULL REFERENCES accounts(id),
   test_code TEXT NOT NULL REFERENCES tests(code) ON DELETE CASCADE,
